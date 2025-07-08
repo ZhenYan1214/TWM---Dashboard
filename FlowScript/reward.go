@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -17,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	// required for increasing the max gRPC size
@@ -169,55 +169,75 @@ func GetBothRewardsBlockEvents(ctx context.Context, blockStart, blockEnd uint64,
 }
 
 func GetBlockEvents(ctx context.Context, blockStart, blockEnd uint64, accessNodeClient *client.Client, all bool, eventString string) (error, bool) {
-	//	fmt.Println("Start = ", blockStart, "End = ", blockEnd);
 	fmt.Print(".")
-	// REWARD_PAID_ EVENT := "A.8624b52f9ddcd04a.FlowIDTableStaking.RewardsPaid"
 
 	blockEvents, err := accessNodeClient.GetEventsForHeightRange(ctx,
 		eventString,
 		blockStart, blockEnd)
-	/*
-		51753836,
-		51753836)
-	*/
 	bFound := false
 
 	if err != nil {
 		panic(err)
-		/*	    fmt.Println("Encounter errors:", err, "Block start =", blockStart, " block end = ", blockEnd)
-			    return err, bFound
-		*/
 	}
-	// twm node ID: e8f4bd649d08ecb5afb7023a0c5e8bb10ce56659399665da8cc9d517e7982f92
+
+	type SimpleEvent struct {
+		EventType    string `json:"eventType"`
+		NodeID       string `json:"nodeID"`
+		DelegatorID  *int   `json:"delegatorID,omitempty"`
+		Amount       string `json:"amount"`
+		EpochCounter int    `json:"epochCounter"`
+		Timestamp    string `json:"timestamp"`
+	}
 
 	for _, blockEvent := range blockEvents {
+		// 取得 block timestamp
+		blockByID, err := accessNodeClient.GetBlockByID(ctx, blockEvent.BlockID)
+		var timestamp string
+		if err == nil {
+			timestamp = blockByID.Timestamp.Format(time.RFC3339)
+		} else {
+			timestamp = ""
+		}
 		for _, event := range blockEvent.Events {
 			if all {
 				fmt.Println("\tEvent type: " + event.Type)
 				fmt.Println("\tEvent: " + event.Value.String())
 				fmt.Println("\tEvent payload: " + string(event.Payload))
 			} else {
-				nodeID, _, _, err := extractNodeIDAndAmount(event.Value.String())
-				if err != nil {
-					fmt.Println("Failed to extract node ID and amount:", err)
-					return err, bFound
-				}
-				// TWM_NODE_ID := "e8f4bd649d08ecb5afb7023a0c5e8bb10ce56659399665da8cc9d517e7982f92"
-				if nodeID == TWM_NODE_ID {
-					// Convert event to JSON for readable output
-					jsonBytes, err := jsoncdc.Encode(event.Value)
-					if err != nil {
-						fmt.Println(string(event.Payload))
-					} else {
-						fmt.Println(string(jsonBytes))
+				fields := event.Value.Fields
+				var nodeID string
+				var delegatorID *int
+				var amount string
+				var epochCounter int
+				if event.Type == REWARD_PAID_EVENT {
+					if len(fields) >= 3 {
+						nodeID = fields[0].ToGoValue().(string)
+						amount = fields[1].ToGoValue().(string)
+						epochCounter = int(fields[2].ToGoValue().(uint64))
 					}
+				} else if event.Type == DELEGATOR_REWARD_PAID_EVENT {
+					if len(fields) >= 4 {
+						nodeID = fields[0].ToGoValue().(string)
+						id := int(fields[1].ToGoValue().(uint32))
+						delegatorID = &id
+						amount = fields[2].ToGoValue().(string)
+						epochCounter = int(fields[3].ToGoValue().(uint64))
+					}
+				}
+				if nodeID == TWM_NODE_ID {
+					eventTypeShort := event.Type[strings.LastIndex(event.Type, ".")+1:]
+					simpleEvent := SimpleEvent{
+						EventType:    eventTypeShort,
+						NodeID:       nodeID,
+						DelegatorID:  delegatorID,
+						Amount:       amount,
+						EpochCounter: epochCounter,
+						Timestamp:    timestamp,
+					}
+					jsonBytes, _ := json.Marshal(simpleEvent)
+					fmt.Println(string(jsonBytes))
 					bFound = true
 				}
-				/*
-				   				} else {
-				       fmt.Print("X")
-				   }
-				*/
 			}
 		}
 	}
