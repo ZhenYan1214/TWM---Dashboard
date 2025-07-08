@@ -20,8 +20,10 @@ import (
 
 	"github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+
 	// required for increasing the max gRPC size
 	// required for increasing the max gRPC size
+	"github.com/onflow/cadence"
 )
 
 // twm node ID: e8f4bd649d08ecb5afb7023a0c5e8bb10ce56659399665da8cc9d517e7982f92
@@ -204,24 +206,24 @@ func GetBlockEvents(ctx context.Context, blockStart, blockEnd uint64, accessNode
 				fmt.Println("\tEvent: " + event.Value.String())
 				fmt.Println("\tEvent payload: " + string(event.Payload))
 			} else {
-				fields := event.Value.Fields
+				fm := event.Value.FieldsMappedByName()
 				var nodeID string
 				var delegatorID *int
 				var amount string
 				var epochCounter int
 				if event.Type == REWARD_PAID_EVENT {
-					if len(fields) >= 3 {
-						nodeID = fields[0].ToGoValue().(string)
-						amount = fields[1].ToGoValue().(string)
-						epochCounter = int(fields[2].ToGoValue().(uint64))
+					if fm["id"] != nil && fm["amount"] != nil && fm["epochCounter"] != nil {
+						nodeID = string(fm["id"].(cadence.String))
+						amount = fm["amount"].(cadence.UFix64).String()
+						epochCounter = int(uint64(fm["epochCounter"].(cadence.UInt64)))
 					}
 				} else if event.Type == DELEGATOR_REWARD_PAID_EVENT {
-					if len(fields) >= 4 {
-						nodeID = fields[0].ToGoValue().(string)
-						id := int(fields[1].ToGoValue().(uint32))
+					if fm["id"] != nil && fm["delegatorID"] != nil && fm["amount"] != nil && fm["epochCounter"] != nil {
+						nodeID = string(fm["id"].(cadence.String))
+						id := int(uint32(fm["delegatorID"].(cadence.UInt32)))
 						delegatorID = &id
-						amount = fields[2].ToGoValue().(string)
-						epochCounter = int(fields[3].ToGoValue().(uint64))
+						amount = fm["amount"].(cadence.UFix64).String()
+						epochCounter = int(uint64(fm["epochCounter"].(cadence.UInt64)))
 					}
 				}
 				if nodeID == TWM_NODE_ID {

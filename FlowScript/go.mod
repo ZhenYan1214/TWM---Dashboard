@@ -25,6 +25,7 @@ require (
 	github.com/logrusorgru/aurora/v4 v4.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-sqlite3 v1.14.28 // indirect
 	github.com/onflow/atree v0.10.0 // indirect
 	github.com/onflow/crypto v0.25.3 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.11 // indirect
