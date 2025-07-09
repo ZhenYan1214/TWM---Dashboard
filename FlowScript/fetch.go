@@ -20,7 +20,6 @@ const (
 	ACCESS_NODE_ADDRESS         = "access.mainnet.nodes.onflow.org:9000"
 )
 
-// RewardData 存儲獎勵資料的結構
 type RewardData struct {
 	Type         string
 	NodeID       string
@@ -31,13 +30,11 @@ type RewardData struct {
 	BlockHeight  uint64
 }
 
-// FlowClient 封裝 Flow 客戶端
 type FlowClient struct {
 	client *client.Client
 	ctx    context.Context
 }
 
-// NewFlowClient 建立新的 Flow 客戶端
 func NewFlowClient() (*FlowClient, error) {
 	accessNodeClient, err := client.NewClient(
 		ACCESS_NODE_ADDRESS,
@@ -56,7 +53,6 @@ func NewFlowClient() (*FlowClient, error) {
 	}, nil
 }
 
-// FetchThisWeekRewards 抓取本周的獎勵資料
 func (fc *FlowClient) FetchThisWeekRewards() ([]RewardData, error) {
 	var allRewards []RewardData
 
@@ -77,31 +73,27 @@ func (fc *FlowClient) FetchThisWeekRewards() ([]RewardData, error) {
 	fmt.Printf("Wednesday block height: %d\n", blockEnd)
 
 	// 搜尋最近的獎勵資料
+	bFound := false
 	blockStart := blockEnd - 249
-	found := false
 
 	fmt.Println("Searching for rewards...")
-	for !found {
-		// 搜尋 RewardsPaid 事件
-		rewardsPaid, foundRewards, err := fc.searchRewards(blockStart, blockEnd, REWARD_PAID_EVENT)
+	for !bFound {
+		fmt.Print(".")
+
+		// 搜尋兩種事件
+		foundRewards, foundDelegator, err := fc.searchBothRewards(blockStart, blockEnd)
 		if err != nil {
 			return nil, err
 		}
-		allRewards = append(allRewards, rewardsPaid...)
 
-		// 搜尋 DelegatorRewardsPaid 事件
-		delegatorRewards, foundDelegator, err := fc.searchRewards(blockStart, blockEnd, DELEGATOR_REWARD_PAID_EVENT)
-		if err != nil {
-			return nil, err
-		}
-		allRewards = append(allRewards, delegatorRewards...)
+		allRewards = append(allRewards, foundRewards...)
+		allRewards = append(allRewards, foundDelegator...)
 
-		found = foundRewards || foundDelegator
+		bFound = len(foundRewards) > 0 || len(foundDelegator) > 0
 
-		if !found {
+		if !bFound {
 			blockStart -= 250
 			blockEnd -= 250
-			fmt.Print(".")
 		}
 	}
 
@@ -109,7 +101,6 @@ func (fc *FlowClient) FetchThisWeekRewards() ([]RewardData, error) {
 	return fc.filterRewards(allRewards), nil
 }
 
-// jumpToWednesday 跳轉到最近的星期三 20:00
 func (fc *FlowClient) jumpToWednesday(blockEnd uint64) (uint64, error) {
 	blockEndProbe := blockEnd
 	iterationStep := uint64(5120)
@@ -124,35 +115,54 @@ func (fc *FlowClient) jumpToWednesday(blockEnd uint64) (uint64, error) {
 		dayOfWeek := timestamp.Weekday()
 		dayOfHour := timestamp.Hour()
 
+		// 計算到星期三的天數
 		daysToTargetDay := int(time.Wednesday - dayOfWeek)
 		hoursToTargetHour := int(20 - dayOfHour)
 
-		fmt.Printf("Block: %d, Day: %s, Hour: %d, Timestamp: %s\n",
-			blockEndProbe, dayOfWeek, dayOfHour, timestamp.Format("2006-01-02 15:04:05"))
+		fmt.Printf("Block probe = %d, Timestamp.Weekday = %s, daystoTargetDay = %d, Hour of day = %d, Timestamp = %s\n",
+			blockEndProbe, dayOfWeek, daysToTargetDay, dayOfHour, timestamp.Format("2006-01-02 15:04:05"))
 
 		if daysToTargetDay == 0 {
 			if hoursToTargetHour < -1 {
+				// 時間晚於 20:00，減少步長
 				blockEndProbe -= iterationStep / 2
 			} else if hoursToTargetHour == 0 || hoursToTargetHour == -1 {
+				// 時間在 20:00 或 21:00，開始搜尋
 				return blockEndProbe, nil
 			} else {
+				// 時間早於 20:00，繼續往前找
 				blockEndProbe -= iterationStep
 			}
 		} else {
+			// 不是星期三，繼續往前找
 			blockEndProbe -= iterationStep
 		}
 	}
 	return blockEndProbe, nil
 }
 
-// searchRewards 搜尋特定事件的獎勵資料
-func (fc *FlowClient) searchRewards(blockStart, blockEnd uint64, eventType string) ([]RewardData, bool, error) {
+func (fc *FlowClient) searchBothRewards(blockStart, blockEnd uint64) ([]RewardData, []RewardData, error) {
+	// 搜尋 RewardsPaid 事件
+	rewardsPaid, err := fc.searchRewards(blockStart, blockEnd, REWARD_PAID_EVENT)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 搜尋 DelegatorRewardsPaid 事件
+	delegatorRewards, err := fc.searchRewards(blockStart, blockEnd, DELEGATOR_REWARD_PAID_EVENT)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return rewardsPaid, delegatorRewards, nil
+}
+
+func (fc *FlowClient) searchRewards(blockStart, blockEnd uint64, eventType string) ([]RewardData, error) {
 	var rewards []RewardData
-	found := false
 
 	blockEvents, err := fc.client.GetEventsForHeightRange(fc.ctx, eventType, blockStart, blockEnd)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	for _, blockEvent := range blockEvents {
@@ -170,10 +180,8 @@ func (fc *FlowClient) searchRewards(blockStart, blockEnd uint64, eventType strin
 
 			// 只處理我們的節點
 			if nodeID == TWM_NODE_ID {
-				found = true
-
-				// 取得 epoch counter (這裡需要根據實際情況調整)
-				epochCounter := fc.getEpochCounter(blockByID.Height)
+				// 計算 epoch counter (簡化版本)
+				epochCounter := fc.calculateEpochCounter(blockByID.Height)
 
 				reward := RewardData{
 					Type:         fc.getEventType(eventType),
@@ -186,44 +194,51 @@ func (fc *FlowClient) searchRewards(blockStart, blockEnd uint64, eventType strin
 				}
 				rewards = append(rewards, reward)
 
-				fmt.Printf("Found reward: Type=%s, DelegatorID=%d, Amount=%.8f\n",
-					reward.Type, reward.DelegatorID, reward.Amount)
+				fmt.Printf("\nFound our node...block ID = %s, blockEnd = %d, amount = %.8f\n",
+					blockEvent.BlockID.String(), blockEnd, amount)
+				fmt.Printf("Block: %s Timestamp: %s\n",
+					blockEvent.BlockID.String(), blockByID.Timestamp.String())
+				if delegatorID > 0 {
+					fmt.Printf("\tDelegatorID = %d\n", delegatorID)
+				}
+				fmt.Printf("\tEvent type: %s\n", event.Type)
+				fmt.Printf("\tEvent: %s\n", event.Value.String())
 			}
 		}
 	}
 
-	return rewards, found, nil
+	return rewards, nil
 }
 
-// extractEventData 從事件字串中提取資料
 func (fc *FlowClient) extractEventData(eventString string) (string, int, float64, error) {
 	pattern := `nodeID: "([^"]+)", (?:\s*delegatorID: (\d+),)?\s*amount: ([0-9.]+)`
 	re := regexp.MustCompile(pattern)
 	matches := re.FindStringSubmatch(eventString)
 
-	if len(matches) < 3 {
-		return "", -1, 0, fmt.Errorf("unable to extract data from event string")
+	lenmatches := len(matches)
+
+	if lenmatches < 3 {
+		return "", -1, 0, fmt.Errorf("unable to extract node ID and amount from event string")
 	}
 
 	nodeID := strings.TrimSpace(matches[1])
 	var delegatorID int
-	if len(matches) == 4 && matches[2] != "" {
+	if lenmatches == 4 && matches[2] != "" {
 		delegatorID, _ = strconv.Atoi(strings.TrimSpace(matches[2]))
 	} else {
 		delegatorID = -1
 	}
 
-	amount, err := strconv.ParseFloat(matches[len(matches)-1], 64)
+	amount, err := strconv.ParseFloat(matches[lenmatches-1], 64)
 	if err != nil {
-		return "", -1, 0, fmt.Errorf("unable to parse amount: %w", err)
+		return "", -1, 0, fmt.Errorf("unable to parse amount from event string: %w", err)
 	}
 
 	return nodeID, delegatorID, amount, nil
 }
 
-// getEventType 取得事件類型的簡化名稱
 func (fc *FlowClient) getEventType(eventType string) string {
-	if strings.Contains(eventType, "RewardsPaid") {
+	if strings.Contains(eventType, "RewardsPaid") && !strings.Contains(eventType, "Delegator") {
 		return "RewardsPaid"
 	} else if strings.Contains(eventType, "DelegatorRewardsPaid") {
 		return "DelegatorRewardsPaid"
@@ -231,14 +246,13 @@ func (fc *FlowClient) getEventType(eventType string) string {
 	return "Unknown"
 }
 
-// getEpochCounter 取得 epoch counter (簡化實現)
-func (fc *FlowClient) getEpochCounter(blockHeight uint64) uint64 {
-	// 這裡需要根據 Flow 的實際邏輯來實現
-	// 暫時返回一個計算值
-	return blockHeight / 100000 // 簡化計算
+func (fc *FlowClient) calculateEpochCounter(blockHeight uint64) uint64 {
+	// 這是簡化的計算，實際情況可能需要更複雜的邏輯
+	// 根據 Flow 的 epoch 機制，每個 epoch 大約包含特定數量的區塊
+	// 這裡使用簡化的計算方式
+	return blockHeight / 100000
 }
 
-// filterRewards 過濾獎勵資料，只保留需要的類型
 func (fc *FlowClient) filterRewards(rewards []RewardData) []RewardData {
 	var filtered []RewardData
 
@@ -254,8 +268,12 @@ func (fc *FlowClient) filterRewards(rewards []RewardData) []RewardData {
 	return filtered
 }
 
-// 主函數用於測試
 func main() {
+	// 印出開始時間
+	currentTime := time.Now()
+	timeStamp := currentTime.Format("2006-01-02 15:04:05")
+	fmt.Println("Current time:", timeStamp)
+
 	client, err := NewFlowClient()
 	if err != nil {
 		panic(err)
@@ -271,4 +289,10 @@ func main() {
 		fmt.Printf("Type: %s, NodeID: %s, DelegatorID: %d, Amount: %.8f, EpochCounter: %d, Timestamp: %s\n",
 			reward.Type, reward.NodeID, reward.DelegatorID, reward.Amount, reward.EpochCounter, reward.Timestamp.Format("2006-01-02 15:04:05"))
 	}
+
+	// 印出結束時間
+	finishedTime := time.Now()
+	timeStamp = finishedTime.Format("2006-01-02 15:04:05")
+	fmt.Println("Finished time:", timeStamp)
+	fmt.Println("***")
 }
