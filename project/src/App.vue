@@ -132,8 +132,32 @@ body, #app {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  min-height: 100vh;
-  overflow: hidden;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto; /* 允許垂直滾動 */
+}
+
+/* Custom Scrollbar */
+body {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--brand-primary) var(--bg-secondary);
+}
+
+body::-webkit-scrollbar {
+  width: 10px;
+}
+
+body::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+body::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--brand-primary), var(--brand-secondary));
+  border-radius: 10px;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--brand-secondary), var(--brand-primary));
 }
 
 #app {
@@ -151,8 +175,8 @@ body, #app {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  height: auto; /* 讓容器依內容自適應高度 */
+  overflow: visible; /* 由 body 控制滾動 */
 }
 
 /* Header */

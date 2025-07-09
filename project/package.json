@@ -12,6 +12,7 @@
   "dependencies": {
     "@vicons/ionicons4": "^0.13.0",
     "core-js": "^3.8.3",
+    "ethers": "^6.15.0",
     "naive-ui": "^2.42.0"
   },
   "devDependencies": {
