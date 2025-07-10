@@ -11,11 +11,11 @@
           <div class="dashboard-switcher">
             <button
               :class="['switch-btn', { active: currentDashboard === 'flow' }]"
-              @click="currentDashboard = 'flow'"
+              @click="switchToDashboard('flow')"
             >Flow</button>
             <button
               :class="['switch-btn', { active: currentDashboard === 'obol' }]"
-              @click="currentDashboard = 'obol'"
+              @click="switchToDashboard('obol')"
             >Obol</button>
           </div>
         </div>
@@ -35,7 +35,10 @@
 
       <!-- Dashboard Content -->
       <Flow v-if="currentDashboard === 'flow'" />
-      <Obol v-else />
+      <Obol v-else-if="currentDashboard === 'obol' && currentPage === 'dashboard'" @go-to-operator-detail="goToOperatorDetail" />
+      <OperatorDetail v-else-if="currentDashboard === 'obol' && currentPage === 'operatorDetail'" 
+                      :operator-data="selectedOperator" 
+                      @go-back="goBackToDashboard" />
     </div>
   </div>
 </template>
@@ -43,17 +46,21 @@
 <script>
 import Flow from './components/Flow.vue'
 import Obol from './components/Obol.vue'
+import OperatorDetail from './components/OperatorDetail.vue'
 
 export default {
   name: 'App',
   components: {
     Flow,
-    Obol
+    Obol,
+    OperatorDetail
   },
   data() {
     return {
       isDarkMode: true,
-      currentDashboard: 'flow'
+      currentDashboard: 'flow',
+      currentPage: 'dashboard', // 'dashboard' 或 'operatorDetail'
+      selectedOperator: null
     }
   },
   methods: {
@@ -70,6 +77,19 @@ export default {
       }
       // 保存到 localStorage
       localStorage.setItem('theme', this.isDarkMode ? 'dark' : 'light');
+    },
+    switchToDashboard(dashboard) {
+      this.currentDashboard = dashboard;
+      this.currentPage = 'dashboard';
+      this.selectedOperator = null;
+    },
+    goToOperatorDetail(operatorData) {
+      this.selectedOperator = operatorData;
+      this.currentPage = 'operatorDetail';
+    },
+    goBackToDashboard() {
+      this.currentPage = 'dashboard';
+      this.selectedOperator = null;
     }
   },
   mounted() {

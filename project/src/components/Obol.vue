@@ -76,19 +76,13 @@
     <section v-else class="distribution-section">
       <div class="distribution-title">Obol Node Operators</div>
       <div class="distribution-grid">
-        <div v-for="(cluster, index) in clusterCards" :key="index" class="distribution-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
+        <div v-for="(cluster, index) in clusterCards" :key="index" class="distribution-card" @click="goToOperatorDetail(cluster, index)" @mouseenter="addCardHover" @mouseleave="removeCardHover">
           <div class="card-header">
             <div class="card-title-section">
-              <div class="card-icon">
-                <svg :width="20" :height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 7L10 17L5 12"/>
-                </svg>
+              <div class="operator-number">
+                #{{ index }}
               </div>
               <span class="card-title">{{ cluster.name || `Operator #${index}` }}</span>
-            </div>
-            <div class="status-indicator" :class="cluster.status">
-              <span class="status-dot"></span>
-              <span class="status-text">{{ cluster.statusText }}</span>
             </div>
           </div>
           
@@ -121,7 +115,7 @@
               
               <div class="detail-row">
                 <div class="detail-label">獎勵地址:</div>
-                <div class="address-badge" @click="copyToClipboard(cluster.rewardAddress)" :title="cluster.rewardAddress">
+                <div class="address-badge" @click.stop="copyToClipboard(cluster.rewardAddress)" :title="cluster.rewardAddress">
                   {{ formatAddress(cluster.rewardAddress) }}
                 </div>
               </div>
@@ -150,13 +144,8 @@
           <span class="summary-value active">{{ totalActiveValidators }} 個</span>
         </div>
         <div class="summary-row">
-          <span class="summary-label">最活躍操作者：</span>
-          <span class="summary-value winner">
-            <svg class="winner-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/>
-            </svg>
-            {{ mostActiveOperator }}
-          </span>
+          <span class="summary-label">表現最佳操作者：</span>
+          <span class="summary-value">{{ mostActiveOperator }}</span>
         </div>
       </div>
     </div>
@@ -320,6 +309,16 @@ export default {
     removeCardHover(event) {
       event.currentTarget.style.transform = 'translateY(0)'
       event.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
+    },
+    goToOperatorDetail(cluster, index) {
+      // 發送事件到父組件，傳遞操作者數據
+      const operatorData = {
+        operatorId: index,
+        operatorData: cluster
+      }
+      
+      console.log('Navigating to operator detail:', operatorData)
+      this.$emit('go-to-operator-detail', operatorData)
     }
   }
 }
@@ -654,6 +653,13 @@ export default {
   transition: all 0.3s ease;
   position: relative;
   min-height: 220px;
+  cursor: pointer;
+}
+
+.distribution-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.15), 0 3px 12px rgba(0,0,0,0.12);
+  border-color: var(--brand-primary);
 }
 
 .distribution-card::before {
@@ -685,7 +691,7 @@ export default {
   gap: 10px;
 }
 
-.distribution-card .card-icon {
+.distribution-card .operator-number {
   width: 36px;
   height: 36px;
   border-radius: 10px;
@@ -694,6 +700,9 @@ export default {
   justify-content: center;
   background: rgba(59, 130, 246, 0.1);
   color: var(--brand-primary);
+  font-size: 14px;
+  font-weight: 700;
+  border: 2px solid rgba(59, 130, 246, 0.2);
 }
 
 .distribution-card .card-title {
@@ -702,58 +711,7 @@ export default {
   color: var(--text-primary);
 }
 
-.distribution-card .status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-}
 
-.distribution-card .status-indicator.healthy {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success);
-}
-
-.distribution-card .status-indicator.warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #F59E0B;
-}
-
-.distribution-card .status-indicator.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--danger);
-}
-
-.distribution-card .status-indicator.info {
-  background: rgba(99, 102, 241, 0.1);
-  color: var(--brand-secondary);
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  animation: pulse 2s infinite;
-}
-
-.status-indicator.healthy .status-dot {
-  background: var(--success);
-}
-
-.status-indicator.warning .status-dot {
-  background: #F59E0B;
-}
-
-.status-indicator.error .status-dot {
-  background: var(--danger);
-}
-
-.status-indicator.info .status-dot {
-  background: var(--brand-secondary);
-}
 
 .validator-stats {
   display: flex;
@@ -884,13 +842,7 @@ export default {
   color: var(--success);
 }
 
-.summary-value.winner {
-  color: var(--success);
-}
 
-.winner-icon {
-  color: var(--success);
-}
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
