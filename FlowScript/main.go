@@ -12,7 +12,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// RewardRecord struct 必須與 fetch2.go 相同
+// RewardRecord struct 必須與 fetch.go 相同
 type RewardRecord struct {
 	Type            string  `json:"type"`
 	NodeID          string  `json:"node_id"`
@@ -131,12 +131,12 @@ func (d *Database) Close() error {
 }
 
 func main() {
-	// 1. 執行 fetch2.go
-	cmd := exec.Command("go", "run", "fetch2.go", "-l", "-j")
+	// 1. 執行 fetch.go
+	cmd := exec.Command("go", "run", "fetch.go", "-l", "-j")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		fmt.Printf("fetch2.go 執行失敗: %v\n", err)
+		fmt.Printf("fetch.go 執行失敗: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -153,7 +153,7 @@ func main() {
 	}
 
 	if len(rewards) == 0 {
-		fmt.Println("⚠️  No rewards found")
+		fmt.Println("No rewards found")
 		return
 	}
 

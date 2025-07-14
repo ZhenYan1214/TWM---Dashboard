@@ -73,7 +73,7 @@ func main() {
 	}
 
 	var blockEnd uint64
-	// the Flow testnet community Access node API endpoint
+	// 設定flow的節點
 	accessNodeAddress := "access.mainnet.nodes.onflow.org:9000"
 
 	// create a gRPC client for the Access node
@@ -99,6 +99,7 @@ func main() {
 	timeStamp := currentTime.Format("2006-01-02 15:04:05")
 	fmt.Println("Current time:", timeStamp)
 
+	// 使用-b的話就會指定高度，沒有的話就是最新高度
 	if *blockHeight != 0 {
 		blockEnd = *blockHeight
 	} else {
@@ -125,6 +126,7 @@ func main() {
 
 	fmt.Println("End height =", blockEnd, " All flag =", *allFlag)
 
+	//看有沒有使用jumpstart
 	// check if we want to jump start to Wed night 20:00
 	if *jumpStart {
 		fmt.Println("Jump to start height on Wednesday ...")
@@ -134,6 +136,8 @@ func main() {
 		}
 		fmt.Println("Find new end height =", blockEnd)
 	}
+
+	//看有沒有使用 -l ，一直找，直到找到reward事件
 	var allRecords []RewardRecord
 	blockStart := blockEnd - 249
 	if *lastReward {
@@ -153,7 +157,7 @@ func main() {
 			blockStart -= 250
 			blockEnd -= 250
 		}
-	} else {
+	} else { //沒有使用 -l 的話，就會把全部的reward event找完成
 		totalBlocks := *totalB
 		iterations := int(totalBlocks / 250)
 		var remaining uint64 = uint64(totalBlocks % 250)
@@ -185,7 +189,7 @@ func main() {
 			allRecords = append(allRecords, records...)
 		}
 	}
-	// print struct slice
+	// print struct
 	fmt.Println("\n結果已經儲存成 struct，內容如下：")
 	for _, r := range allRecords {
 		fmt.Printf("%+v\n", r)
@@ -193,7 +197,7 @@ func main() {
 
 	// 將結果生成 JSON 檔案
 	if len(allRecords) > 0 {
-		jsonData, err := json.MarshalIndent(allRecords, "", "  ")
+		jsonData, err := json.MarshalIndent(allRecords, "", "  ") //轉成json，然後自動排版
 		if err != nil {
 			fmt.Printf("JSON marshal error: %v\n", err)
 			os.Exit(1)
