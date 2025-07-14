@@ -88,26 +88,11 @@
     <div class="summary-info-card">
       <div class="summary-title">
         <svg class="summary-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-        本週摘要
+        待更新
       </div>
       <div class="summary-content">
         <div class="summary-row">
-          <span class="summary-label">總 Reward 成長率：</span>
-          <span class="summary-value growth">+3.2%（較上週）</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-label">本週大贏家：</span>
-          <span class="summary-value winner">
-            <svg class="winner-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/></svg>
-            Delegator #4
-          </span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-label">本週跌最多：</span>
-          <span class="summary-value loser">
-            <svg class="loser-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 15s1.5-2 4-2 4 2 4 2"/><path d="M9 9h.01M15 9h.01"/></svg>
-            Delegator #3
-          </span>
+          <span class="summary-label">此區塊功能將於日後完工，敬請期待。</span>
         </div>
       </div>
     </div>
