@@ -291,6 +291,51 @@ func (d *Database) GetRewardStats() (map[string]interface{}, error) {
 	return stats, nil
 }
 
+// 取得最新一批（timestamp 最大）獎勵資料
+func (d *Database) GetLatestBatchRewards() ([]RewardData, error) {
+	// 查詢最新的 timestamp
+	var latestTimestamp string
+	err := d.db.QueryRow(`SELECT MAX(timestamp) FROM rewards`).Scan(&latestTimestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest timestamp: %w", err)
+	}
+
+	// 查詢該 timestamp 的所有資料
+	query := `
+        SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total2, delegator_total3, delegator_total4, node_total
+        FROM rewards
+        WHERE timestamp = ?
+        ORDER BY node_id
+    `
+	rows, err := d.db.Query(query, latestTimestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query latest batch rewards: %w", err)
+	}
+	defer rows.Close()
+
+	var rewards []RewardData
+	for rows.Next() {
+		var reward RewardData
+		err := rows.Scan(
+			&reward.Type,
+			&reward.NodeID,
+			&reward.DelegatorID,
+			&reward.Amount,
+			&reward.EpochCounter,
+			&reward.Timestamp,
+			&reward.Delegator_total2,
+			&reward.Delegator_total3,
+			&reward.Delegator_total4,
+			&reward.Node_total,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan reward: %w", err)
+		}
+		rewards = append(rewards, reward)
+	}
+	return rewards, nil
+}
+
 // Close 關閉數據庫連接
 func (d *Database) Close() error {
 	return d.db.Close()
