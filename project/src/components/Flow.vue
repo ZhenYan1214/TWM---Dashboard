@@ -11,7 +11,7 @@
               <path v-else d="M12 2L2 7L12 12L22 7L12 2Z"/>
             </svg>
           </div>
-          <div class="change-badge" :class="{ 'positive': card.change > 0, 'negative': card.change < 0 }">
+          <div class="change-badge" :class="{ 'positive': card.change > 0, 'negative': card.change < 0, 'neutral': card.change === 0 }">
             <span class="change-amount">{{ formatChange(card.change) }}</span>
             <svg v-if="card.change > 0" class="arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M7 14L12 9L17 14"/>
@@ -36,7 +36,7 @@
 
     <!-- Bottom Distribution Cards -->
     <section class="distribution-section">
-      <div class="distribution-title">本周 Reward 變動</div>
+      <div class="distribution-title">本週 Reward 變動</div>
       <div class="distribution-grid">
         <div v-for="card in distributionCards" :key="card.id" class="distribution-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
           <div class="card-header">
@@ -49,7 +49,7 @@
               </div>
               <span class="card-title">{{ card.label }}</span>
             </div>
-            <div class="change-indicator" :class="{ 'positive': card.change > 0, 'negative': card.change < 0 }">
+            <div class="change-indicator" :class="{ 'positive': card.change > 0, 'negative': card.change < 0, 'neutral': card.change === 0 }">
               <span class="change-amount">{{ formatChange(card.change) }}</span>
               <svg v-if="card.change > 0" class="arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M7 14L12 9L17 14"/>
@@ -104,78 +104,123 @@ export default {
   name: 'Flow',
   data() {
     return {
-      overviewCards: [
+      overviewCards: [ // 顯示 Delegator 總額
         {
           label: 'Delegator #2 總獎勵',
-          amount: 847.21,
+          amount: 0, 
           change: 27.01,
         },
         {
           label: 'Delegator #3 總獎勵',
-          amount: 82.77,
+          amount: 0, 
           change: -1.23,
         },
         {
           label: 'Delegator #4 總獎勵',
-          amount: 12055.09,
+          amount: 0, 
           change: 54.00,
         },
       ],
-      distributionCards: [
+      distributionCards: [ // 顯示本周新增內容
         {
           id: 'node',
           label: 'Node',
-          amount: 1247.0448,
+          amount: 0,
           change: 123.88,
-          lastWeek: 8708.34,
-          idDisplay: 'e8f4bd64...e7982f92',
-          fullId: 'e8f4bd649d08ecb5afb7023a0c5e8bb10ce56659399665da8cc9d517e7982f92',
-          nodeId: 'e8f4bd64...e7982f92',
           delegatorId: 'NODE',
-          epochCounter: 186,
-          isMainNode: true
+          epochCounter: 0,
         },
         {
           id: 'delegator2',
           label: 'Delegator #2',
-          amount: 5.3658,
+          amount: 0,
           change: 4.68,
-          lastWeek: 2.1,
-          idDisplay: 'e8f4bd64...22f92',
-          fullId: 'e8f4bd649d08ecb5afb7023a0c5e8bb10ce56659399665da8cc9d517e7982f92',
-          nodeId: 'e8f4bd64...22f92',
           delegatorId: 'DEL-002',
-          epochCounter: 188,
-          isMainNode: false
+          epochCounter: 0,
         },
         {
           id: 'delegator3',
           label: 'Delegator #3',
-          amount: 0.2083,
+          amount: 0,
           change: -0.12,
-          lastWeek: 2.1,
-          idDisplay: 'e8f4bd64...32f92',
-          fullId: 'e8f4bd649d08ecb5afb7023a0c5e8bb10ce56659399665da8cc9d517e7982f92',
-          nodeId: 'e8f4bd64...32f92',
           delegatorId: 'DEL-003',
-          epochCounter: 189,
-          isMainNode: false
+          epochCounter: 0,
         },
         {
           id: 'delegator4',
           label: 'Delegator #4',
-          amount: 2905.6766,
+          amount: 0,
           change: 2.34,
-          lastWeek: 2.1,
-          idDisplay: 'e8f4bd64...42f92',
-          fullId: 'e8f4bd649d08ecb5afb7023a0c5e8bb10ce56659399665da8cc9d517e7982f92',
-          nodeId: 'e8f4bd64...42f92',
           delegatorId: 'DEL-004',
-          epochCounter: 190,
-          isMainNode: false
+          epochCounter: 0,
         }
       ]
     }
+  },
+  async mounted() { // 跟Api server進行交互
+    const res = await fetch('http://localhost:8080/api/rewards');
+    const data = await res.json();
+
+    // 1. 設定 Delegator 總額
+    const delegator = data.find(item => item.type === 'Delegator');
+    if (delegator) {
+      this.overviewCards[0].amount = delegator.delegator_total2;
+      this.overviewCards[1].amount = delegator.delegator_total3;
+      this.overviewCards[2].amount = delegator.delegator_total4;
+    }
+
+    // 2. 取得本週（最新 timestamp）
+    const latestTimestamp = data.length > 0 ? data[0].timestamp : null;
+    // 3. 取得上週（次新 timestamp）
+    let lastWeekTimestamp = null;
+    if (latestTimestamp) {
+      // 找出所有不同的 timestamp，排序取次新
+      const timestamps = [...new Set(data.map(item => item.timestamp))].sort().reverse();
+      if (timestamps.length > 1) {
+        lastWeekTimestamp = timestamps[1];
+      }
+    }
+
+    // 4. 取得上週資料
+    const lastWeekData = lastWeekTimestamp ? data.filter(item => item.timestamp === lastWeekTimestamp) : [];
+    // 4.1 取得上週的 delegator_total2/3/4
+    let lastTotal2 = 0, lastTotal3 = 0, lastTotal4 = 0;
+    if (lastWeekData.length > 0) {
+      const lastDelegator = lastWeekData.find(item => item.type === 'Delegator');
+      if (lastDelegator) {
+        lastTotal2 = lastDelegator.delegator_total2;
+        lastTotal3 = lastDelegator.delegator_total3;
+        lastTotal4 = lastDelegator.delegator_total4;
+      }
+    }
+
+    // 5. 設定 overviewCards 的 change
+    this.overviewCards[0].change = delegator && lastWeekData.length > 0 ? (delegator.delegator_total2 - lastTotal2) : 0;
+    this.overviewCards[1].change = delegator && lastWeekData.length > 0 ? (delegator.delegator_total3 - lastTotal3) : 0;
+    this.overviewCards[2].change = delegator && lastWeekData.length > 0 ? (delegator.delegator_total4 - lastTotal4) : 0;
+
+    // 6. 設定 distributionCards 的 amount、epochCounter、change
+    this.distributionCards.forEach(card => {
+      let now, last;
+      if (card.delegatorId === 'NODE') {
+        now = data.find(item => item.type === 'Node');
+        last = lastWeekData.find(item => item.type === 'Node');
+      } else if (card.delegatorId === 'DEL-002') {
+        now = data.find(item => item.type === 'Delegator' && item.delegator_id === 2);
+        last = lastWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 2);
+      } else if (card.delegatorId === 'DEL-003') {
+        now = data.find(item => item.type === 'Delegator' && item.delegator_id === 3);
+        last = lastWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 3);
+      } else if (card.delegatorId === 'DEL-004') {
+        now = data.find(item => item.type === 'Delegator' && item.delegator_id === 4);
+        last = lastWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 4);
+      }
+      if (now) {
+        card.amount = now.amount;
+        card.epochCounter = now.epoch_counter;
+        card.change = last ? (now.amount - last.amount) : 0;
+      }
+    });
   },
   methods: {
     addCardHover(event) {
@@ -282,6 +327,16 @@ export default {
 .overview-card .change-badge.negative {
   background: rgba(239, 68, 68, 0.1);
   color: var(--danger);
+}
+
+.overview-card .change-badge.neutral {
+  background: #f5f6fa;
+  color: #8a8f98;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 1px;
+  border: 1px solid #e5e7eb;
+  box-shadow: none;
 }
 
 .overview-card .card-content {
@@ -446,6 +501,16 @@ export default {
 .distribution-card .change-indicator.negative {
   background: rgba(239, 68, 68, 0.1);
   color: var(--danger);
+}
+
+.distribution-card .change-indicator.neutral {
+  background: #f7f8fa;
+  color: #b0b4ba;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  border: 1px solid #ececec;
+  box-shadow: none;
 }
 
 .distribution-card .card-content {
