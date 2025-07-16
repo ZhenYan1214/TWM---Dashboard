@@ -5,10 +5,16 @@
       <div v-for="card in overviewCards" :key="card.label" class="overview-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
         <div class="card-header">
           <div class="card-icon">
-            <svg :width="24" :height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path v-if="card.label === '本週總獎勵'" d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/>
-              <path v-else-if="card.label === '本月總獎勵'" d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"/>
-              <path v-else d="M12 2L2 7L12 12L22 7L12 2Z"/>
+            <svg width="52" height="52" viewBox="0 0 32 32" fill="none">
+              <defs>
+                <linearGradient id="user-blue" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#7eb6ff"/>
+                  <stop offset="100%" stop-color="#b3aaff"/>
+                </linearGradient>
+              </defs>
+              <circle cx="16" cy="16" r="14" fill="url(#user-blue)" opacity="0.18"/>
+              <circle cx="16" cy="13" r="5" stroke="url(#user-blue)" stroke-width="2.2" fill="#fff"/>
+              <ellipse cx="16" cy="22.5" rx="7" ry="4.5" stroke="url(#user-blue)" stroke-width="2.2" fill="#fff"/>
             </svg>
           </div>
           <div class="change-badge" :class="{ 'positive': card.change > 0, 'negative': card.change < 0, 'neutral': card.change === 0 }">
@@ -42,9 +48,25 @@
           <div class="card-header">
             <div class="card-title-section">
               <div class="card-icon">
-                <svg :width="20" :height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path v-if="card.id === 'node'" d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/>
-                  <path v-else d="M20 7L10 17L5 12"/>
+                <svg v-if="card.id === 'node'" width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <defs>
+                    <linearGradient id="star-blue" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#7eb6ff"/>
+                      <stop offset="100%" stop-color="#b3aaff"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M14 3L17.09 10.26L25 11.27L19 17.14L20.18 25.02L14 21.77L7.82 25.02L9 17.14L3 11.27L10.91 10.26L14 3Z"
+                    stroke="url(#star-blue)" stroke-width="2.2" fill="none"/>
+                </svg>
+                <svg v-else width="42" height="42" viewBox="0 0 28 28" fill="none">
+                  <defs>
+                    <linearGradient id="check-blue" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#7eb6ff"/>
+                      <stop offset="100%" stop-color="#b3aaff"/>
+                    </linearGradient>
+                  </defs>
+                  <circle cx="14" cy="14" r="12" fill="url(#check-blue)" opacity="0.13"/>
+                  <path d="M8 15L13 20L20 9" stroke="url(#check-blue)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </div>
               <span class="card-title">{{ card.label }}</span>
@@ -158,7 +180,7 @@ export default {
     }
   },
   async mounted() { // 跟Api server進行交互
-    const res = await fetch('http://localhost:8081/api/rewards');
+    const res = await fetch('/api/rewards');
     const data = await res.json();
 
     // 1. 設定 Delegator 總額
@@ -355,11 +377,22 @@ export default {
   margin-bottom: 12px;
 }
 
-.overview-card .main-amount {
+.overview-card .main-amount,
+.distribution-card .main-amount {
   font-size: 36px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.1;
+  font-weight: 900;
+  background: linear-gradient(90deg, #7eb6ff 0%, #b3aaff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+  text-shadow: 0 2px 12px rgba(126,182,255,0.08), 0 1px 2px rgba(179,170,255,0.06);
+  letter-spacing: 1.2px;
+  transition: transform 0.18s cubic-bezier(.4,2,.6,1);
+}
+.overview-card:hover .main-amount,
+.distribution-card:hover .main-amount {
+  transform: scale(1.06);
 }
 
 .overview-card .unit {
@@ -574,6 +607,7 @@ export default {
   color: var(--brand-secondary);
   border: 1px solid rgba(99, 102, 241, 0.2);
   margin-bottom: 2px;
+  animation: change-breath 1.8s infinite cubic-bezier(.4,2,.6,1);
 }
 
 .distribution-card .delegator-badge.main-node {
@@ -597,6 +631,16 @@ export default {
 @keyframes arrowMove {
   0% { transform: translateY(0); }
   100% { transform: translateY(-1px); }
+}
+
+@keyframes change-breath {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.35); }
+  100% { filter: brightness(1); }
+}
+.overview-card .change-badge .change-amount,
+.distribution-card .change-indicator .change-amount {
+  animation: change-breath 1.8s infinite cubic-bezier(.4,2,.6,1);
 }
 
 /* Responsive Design */
