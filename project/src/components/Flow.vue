@@ -158,7 +158,7 @@ export default {
     }
   },
   async mounted() { // 跟Api server進行交互
-    const res = await fetch('http://localhost:8080/api/rewards');
+    const res = await fetch('http://localhost:8081/api/rewards');
     const data = await res.json();
 
     // 1. 設定 Delegator 總額
@@ -546,7 +546,7 @@ export default {
   flex-direction: row;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 22px;
 }
 
 .distribution-card .detail-row {
@@ -559,7 +559,7 @@ export default {
 
 .distribution-card .detail-label {
   color: var(--text-muted);
-  font-weight: 500;
+  font-weight: 600;
   min-width: 70px;
   margin-bottom: 2px;
 }
@@ -568,7 +568,7 @@ export default {
 .distribution-card .epoch-badge {
   padding: 3px 8px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   background: rgba(99, 102, 241, 0.1);
   color: var(--brand-secondary);
@@ -580,12 +580,14 @@ export default {
   background: rgba(16, 185, 129, 0.1);
   color: var(--success);
   border: 1px solid rgba(16, 185, 129, 0.2);
+  
 }
 
 .distribution-card .epoch-badge {
   background: rgba(59, 130, 246, 0.1);
   color: var(--brand-primary);
   border: 1px solid rgba(59, 130, 246, 0.2);
+  
 }
 
 .arrow {
@@ -742,6 +744,7 @@ export default {
 .loser-icon {
   color: var(--danger);
 }
+
 
 @media (max-width: 1200px) {
   .summary-info-card {
