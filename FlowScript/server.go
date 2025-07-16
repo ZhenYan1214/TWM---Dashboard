@@ -10,6 +10,18 @@ import (
 func main() {
 	r := gin.Default()
 
+	// CORS middleware
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
+
 	// 取得最新一批獎勵資料（timestamp 最大的那批）
 	r.GET("/api/rewards", func(c *gin.Context) {
 		db, err := NewDatabase("data.db")
