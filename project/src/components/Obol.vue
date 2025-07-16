@@ -26,27 +26,7 @@
       </div>
     </section>
 
-    <!-- Module Status Indicator -->
-    <section class="module-status-section">
-      <div class="module-status-card">
-        <div class="status-header">
-          <div class="status-icon" :class="moduleStatus.status">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M8 14s1.5-2 4-2 4 2 4 2"/>
-              <path d="M9 9h.01M15 9h.01"/>
-            </svg>
-          </div>
-          <div class="status-content">
-            <h3 class="status-title">Obol 模組狀態</h3>
-            <p class="status-description">{{ moduleStatus.description }}</p>
-          </div>
-          <div class="status-badge-large" :class="moduleStatus.status">
-            {{ moduleStatus.statusText }}
-          </div>
-        </div>
-      </div>
-    </section>
+
 
     <!-- Divider -->
     <div class="divider"></div>
@@ -69,7 +49,7 @@
       </div>
       <h3>載入錯誤</h3>
       <p>{{ error }}</p>
-      <button @click="fetchObolData" class="retry-button">重試</button>
+      <button @click="refreshData" class="retry-button">重試</button>
     </div>
 
     <!-- Bottom Distribution Cards -->
@@ -89,11 +69,11 @@
           <div class="card-content">
             <div class="validator-stats">
               <div class="stat-item">
-                <div class="stat-label">活躍驗證器</div>
+                <div class="stat-label">Active Validators</div>
                 <div class="stat-value active">{{ cluster.totalVettedValidators }}</div>
               </div>
               <div class="stat-item">
-                <div class="stat-label">已退出</div>
+                <div class="stat-label">Exited Validators</div>
                 <div class="stat-value exited">{{ cluster.totalExitedValidators }}</div>
               </div>
             </div>
@@ -162,40 +142,32 @@ export default {
       isLoading: true,
       error: null,
       clusterCards: [],
-      moduleStatus: {
-        status: 'healthy',
-        statusText: '正常運行',
-        description: 'Obol Network 正在正常運行，所有系統狀態良好'
-      }
+      loadingProgress: '',
+      // 快取配置
+      cacheKey: 'obol_clusters_data',
+      cacheExpiryTime: 5 * 60 * 1000, // 5分鐘快取過期時間
+      lastFetchTime: null
     }
   },
   computed: {
     overviewCards() {
       const activeCount = this.clusterCards.filter(cluster => cluster.active).length
       const totalValidators = this.clusterCards.reduce((sum, cluster) => sum + cluster.totalVettedValidators, 0)
-      const avgValidators = this.clusterCards.length > 0 ? Math.round(totalValidators / this.clusterCards.length) : 0
 
       return [
         {
-          label: '活躍 Clusters',
+          label: 'Clusters',
           amount: activeCount,
           unit: '個',
           status: activeCount > 0 ? 'healthy' : 'warning',
           statusText: activeCount > 0 ? '運行中' : '待啟動'
         },
         {
-          label: '總驗證器數量',
+          label: 'Total Validators',
           amount: totalValidators,
           unit: '個',
           status: totalValidators > 0 ? 'healthy' : 'error',
           statusText: totalValidators > 0 ? '活躍' : '無活動'
-        },
-        {
-          label: '平均驗證器數',
-          amount: avgValidators,
-          unit: '個/操作者',
-          status: 'info',
-          statusText: '統計'
         }
       ]
     },
@@ -212,16 +184,112 @@ export default {
     }
   },
   async mounted() {
-    await this.fetchObolData()
+    await this.loadObolData()
   },
   methods: {
-    async fetchObolData() {
+    // 檢查快取是否有效
+    isCacheValid() {
+      try {
+        const cachedData = sessionStorage.getItem(this.cacheKey)
+        const cacheTimestamp = sessionStorage.getItem(`${this.cacheKey}_timestamp`)
+        
+        if (!cachedData || !cacheTimestamp) {
+          return false
+        }
+        
+        const now = Date.now()
+        const cacheAge = now - parseInt(cacheTimestamp)
+        
+        return cacheAge < this.cacheExpiryTime
+      } catch (error) {
+        console.error('Error checking cache:', error)
+        return false
+      }
+    },
+    
+    // 從快取載入資料
+    loadFromCache() {
+      try {
+        const cachedData = sessionStorage.getItem(this.cacheKey)
+        const cacheTimestamp = sessionStorage.getItem(`${this.cacheKey}_timestamp`)
+        
+                 if (cachedData && cacheTimestamp) {
+           const data = JSON.parse(cachedData)
+           this.clusterCards = data.clusterCards || []
+           this.lastFetchTime = parseInt(cacheTimestamp)
+           console.log('資料已從快取載入')
+           return true
+         }
+      } catch (error) {
+        console.error('Error loading from cache:', error)
+        this.clearCache()
+      }
+      return false
+    },
+    
+    // 儲存資料到快取
+    saveToCache() {
+      try {
+        const dataToCache = {
+          clusterCards: this.clusterCards
+        }
+        const timestamp = Date.now()
+        
+        sessionStorage.setItem(this.cacheKey, JSON.stringify(dataToCache))
+        sessionStorage.setItem(`${this.cacheKey}_timestamp`, timestamp.toString())
+        this.lastFetchTime = timestamp
+        console.log('資料已儲存到快取')
+      } catch (error) {
+        console.error('Error saving to cache:', error)
+      }
+    },
+    
+    // 清除快取
+    clearCache() {
+      try {
+        sessionStorage.removeItem(this.cacheKey)
+        sessionStorage.removeItem(`${this.cacheKey}_timestamp`)
+        this.lastFetchTime = null
+        console.log('快取已清除')
+      } catch (error) {
+        console.error('Error clearing cache:', error)
+      }
+    },
+    
+    // 主要載入函數（檢查快取或拉取新資料）
+    async loadObolData() {
+      this.isLoading = true
+      this.error = null
+      this.loadingProgress = '檢查快取資料...'
+      
+      // 檢查快取
+      if (this.isCacheValid() && this.loadFromCache()) {
+        this.isLoading = false
+        this.loadingProgress = ''
+        return
+      }
+      
+      // 快取無效或不存在，重新拉取資料
+      await this.fetchObolData()
+    },
+
+    async fetchObolData(forceRefresh = false) {
       this.isLoading = true
       this.error = null
       
+      // 如果不是強制重新整理且有有效快取，直接載入快取
+      if (!forceRefresh && this.isCacheValid() && this.loadFromCache()) {
+        this.isLoading = false
+        return
+      }
+      
+      this.loadingProgress = '正在連接 Obol Network...'
+      
       try {
+        this.loadingProgress = '正在拉取節點操作者資料...'
         const nodeOperators = await ether_obol.getObolOperatorClustersRegistry()
         
+        this.loadingProgress = '正在處理資料...'
         this.clusterCards = nodeOperators.map((operator, index) => ({
           active: operator[0], // active
           name: operator[1] || `Operator #${index}`, // name
@@ -233,22 +301,26 @@ export default {
           status: this.getClusterStatus(operator),
           statusText: this.getClusterStatusText(operator)
         }))
-
-        // 更新模組狀態
-        this.updateModuleStatus()
+        
+        // 儲存到快取
+        this.saveToCache()
+        this.loadingProgress = '資料載入完成'
         
       } catch (err) {
         console.error('Error fetching Obol data:', err)
         this.error = '無法載入 Obol Network 資料，請稍後再試'
-        this.moduleStatus = {
-          status: 'error',
-          statusText: '連接錯誤',
-          description: '無法連接到 Obol Network，請檢查網路連接'
-        }
+        this.loadingProgress = ''
       } finally {
         this.isLoading = false
       }
     },
+    
+    // 強制重新整理資料
+    async refreshData() {
+      this.clearCache()
+      await this.fetchObolData(true)
+    },
+    
     getClusterStatus(operator) {
       const active = operator[0]
       const totalVetted = parseInt(operator[3]) || 0
@@ -266,30 +338,6 @@ export default {
       if (totalVetted > 50) return '高活躍'
       if (totalVetted > 10) return '中活躍'
       return '低活躍'
-    },
-    updateModuleStatus() {
-      const activeCount = this.clusterCards.filter(cluster => cluster.active).length
-      const totalCount = this.clusterCards.length
-      
-      if (activeCount === 0) {
-        this.moduleStatus = {
-          status: 'error',
-          statusText: '服務異常',
-          description: '所有 Cluster 都處於非活躍狀態'
-        }
-      } else if (activeCount < totalCount * 0.5) {
-        this.moduleStatus = {
-          status: 'warning',
-          statusText: '部分異常',
-          description: `${activeCount}/${totalCount} 個 Cluster 處於活躍狀態`
-        }
-      } else {
-        this.moduleStatus = {
-          status: 'healthy',
-          statusText: '正常運行',
-          description: `${activeCount}/${totalCount} 個 Cluster 正在正常運行`
-        }
-      }
     },
     formatAddress(address) {
       if (!address) return 'N/A'
@@ -470,86 +518,7 @@ export default {
   opacity: 0.7;
 }
 
-/* Module Status Section */
-.module-status-section {
-  margin-bottom: 32px;
-}
 
-.module-status-card {
-  background: var(--bg-card);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-sm);
-  padding: 24px;
-}
-
-.status-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.status-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.status-icon.healthy {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success);
-}
-
-.status-icon.warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #F59E0B;
-}
-
-.status-icon.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--danger);
-}
-
-.status-content {
-  flex: 1;
-}
-
-.status-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.status-description {
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-.status-badge-large {
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.status-badge-large.healthy {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success);
-}
-
-.status-badge-large.warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #F59E0B;
-}
-
-.status-badge-large.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--danger);
-}
 
 /* Divider */
 .divider {
