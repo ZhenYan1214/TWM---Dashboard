@@ -10,18 +10,18 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0',
+    //host: '0.0.0.0',
     port: 8080,
-    proxy: {
-      '/api': {
-        target: 'http://10.10.10.14:8081', // 寫你 API server 的內網 IP
-        changeOrigin: true,
-      },
-    },
-    hmr: {
-      host: '210.208.114.190',
-      port: 8080,
-    },
+    //proxy: {
+     // '/api': {
+       // target: 'http://10.10.10.14:8081', 
+       // changeOrigin: true,
+     // },
+   // },
+    //hmr: {
+      //host: '210.208.114.190',
+      //port: 8080,
+    //},
   },
   
 
