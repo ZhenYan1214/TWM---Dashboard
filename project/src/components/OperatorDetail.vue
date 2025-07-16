@@ -1,5 +1,61 @@
 <template>
   <div class="operator-detail-dashboard">
+    
+    <!-- 載入進度畫面 -->
+    <div v-if="isPageLoading" class="loading-overlay">
+      <div class="loading-container">
+        <div class="loading-header">
+          <div class="loading-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/>
+            </svg>
+          </div>
+          <h2 class="loading-title">載入操作者資料</h2>
+          <p class="loading-subtitle">正在準備 Operator #{{ operatorId }} 的詳細資訊</p>
+        </div>
+
+        <!-- 進度條 -->
+        <div class="progress-section">
+          <div class="progress-bar">
+            <div class="progress-fill" :style="{ width: loadingProgress + '%' }"></div>
+          </div>
+          <div class="progress-text">{{ Math.round(loadingProgress) }}%</div>
+        </div>
+
+        <!-- 載入步驟 -->
+        <div class="loading-steps">
+          <div v-for="(step, index) in loadingSteps" 
+               :key="index" 
+               :class="['loading-step', { 
+                 'completed': step.completed, 
+                 'current': currentLoadingStep === step.name && !step.completed 
+               }]">
+            <div class="step-indicator">
+              <svg v-if="step.completed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6L9 17L4 12"/>
+              </svg>
+              <div v-else-if="currentLoadingStep === step.name" class="step-loading">
+                <div class="loading-spinner"></div>
+              </div>
+              <div v-else class="step-pending"></div>
+            </div>
+            <div class="step-content">
+              <span class="step-text">{{ step.name }}</span>
+              <!-- 圖表初始化進度顯示 -->
+              <div v-if="step.name === '初始化所有圖表' && chartsInitializing" class="charts-progress">
+                <div class="charts-progress-bar">
+                  <div class="charts-progress-fill" :style="{ width: chartsProgress + '%' }"></div>
+                </div>
+                <span class="charts-progress-text">{{ Math.round(chartsProgress) }}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 實際頁面內容 -->
+    <div v-else class="page-content">
     <!-- Top Overview Section -->
     <section class="overview-section">
       <div class="operator-header-card">
@@ -199,11 +255,98 @@
       </div>
     </section>
 
+    <!-- Historical Trends Section - 切換式圖表 -->
+    <section class="historical-trends-section">
+      <div class="trends-card">
+        <div class="chart-header">
+          <div class="header-left">
+            <h3 class="chart-title">Validator 狀態趨勢</h3>
+
+          </div>
+          
+          <!-- 時間維度選擇器 -->
+          <div class="period-selector">
+            <button v-for="period in availablePeriods" 
+                    :key="period.value" 
+                    @click="switchPeriod(period.value)"
+                    :class="['period-btn', { 
+                      active: selectedPeriod === period.value,
+                      loading: charts[period.value].loading
+                    }]"
+                    :disabled="charts[period.value].loading">
+              <span v-if="charts[period.value].loading" class="btn-loading-indicator"></span>
+              {{ period.label }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 單一圖表容器 -->
+        <div class="chart-container">
+          <!-- Loading overlay -->
+          <div v-if="charts[selectedPeriod].loading" class="chart-loading">
+            <div class="loading-spinner-large"></div>
+            <div class="loading-text">
+              <p>載入{{ selectedPeriodText }}數據中...</p>
+              <small>請稍候...</small>
+            </div>
+          </div>
+          
+          <!-- Chart canvas - 所有畫布都渲染但只顯示當前選中的 -->
+          <canvas v-for="period in availablePeriods"
+                  :key="period.value"
+                  :ref="`chartCanvas_${period.value}`" 
+                  v-show="selectedPeriod === period.value && !charts[period.value].loading && !charts[period.value].error && charts[period.value].data"
+                  class="chart-canvas"></canvas>
+          
+          <!-- Error state -->
+          <div v-if="!charts[selectedPeriod].loading && charts[selectedPeriod].error" class="chart-error">
+            <div class="error-icon">⚠️</div>
+            <p>{{ charts[selectedPeriod].error }}</p>
+            <div class="error-actions">
+              <button @click="loadChartData(selectedPeriod)" class="retry-btn">重試載入</button>
+              <button @click="recreateChart(selectedPeriod)" class="debug-btn">重新創建圖表</button>
+            </div>
+          </div>
+          
+          <!-- Empty state -->
+          <div v-if="!charts[selectedPeriod].loading && !charts[selectedPeriod].error && !charts[selectedPeriod].data" class="chart-empty">
+            <div class="empty-icon">📊</div>
+            <p>尚未載入{{ selectedPeriodText }}數據</p>
+            <button @click="loadChartData(selectedPeriod)" class="retry-btn">載入數據</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    </div> <!-- page-content 結束 -->
   </div>
 </template>
 
 <script>
 import { ether_obol } from '../utils/obol.js'
+import { 
+  Chart,
+  LineController,
+  LineElement, 
+  PointElement,
+  LinearScale,
+  CategoryScale,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js'
+
+// 只註冊必要的 Chart.js 組件
+Chart.register(
+  LineController,
+  LineElement, 
+  PointElement,
+  LinearScale,
+  CategoryScale,
+  Title,
+  Tooltip,
+  Legend
+)
 
 export default {
   name: 'OperatorDetail',
@@ -235,12 +378,42 @@ export default {
       // Reward Share 相關數據
       rewardShareData: null,
       rewardShareLoading: false,
-      rewardShareError: null
+      rewardShareError: null,
+      // Chart 相關數據 - 重構為多圖表實例
+      charts: {
+        '1m': { data: null, loading: false, error: null, instance: null },
+        '1y': { data: null, loading: false, error: null, instance: null },
+        'all': { data: null, loading: false, error: null, instance: null }
+      },
+      chartsInitializing: false,
+      chartsProgress: 0,
+      selectedPeriod: '1m', // 當前選中的時間維度
+      // 精簡時間維度選擇
+      availablePeriods: [
+        { value: '1m', label: '1個月' },
+        { value: '1y', label: '1年' },
+        { value: 'all', label: '全部' }
+      ],
+      // 頁面載入進度
+      isPageLoading: true,
+      loadingProgress: 0,
+      loadingSteps: [
+        { name: '初始化操作者資訊', completed: false },
+        { name: '載入 Split Wallet 地址', completed: false },
+        { name: '載入分潤配置資料', completed: false },
+        { name: '初始化所有圖表', completed: false }
+      ],
+      currentLoadingStep: ''
     }
   },
   computed: {
     operatorName() {
       return this.operatorInfo.name || `Operator #${this.operatorId}`
+    },
+
+    selectedPeriodText() {
+      const period = this.availablePeriods.find(p => p.value === this.selectedPeriod)
+      return period ? period.label : '未知'
     },
 
     overviewCards() {
@@ -280,11 +453,7 @@ export default {
       immediate: true,
       handler(newData) {
         if (newData) {
-          this.initializeData(newData)
-          // 自動載入 Split Wallet 資料
-          this.$nextTick(() => {
-            this.fetchSplitWalletData()
-          })
+          this.startLoadingSequence(newData)
         }
       }
     }
@@ -323,50 +492,19 @@ export default {
       event.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
     },
     
-    // Split Wallet 相關方法
+    // Split Wallet 相關方法（用於手動刷新）
     async fetchSplitWalletData() {
-      if (!this.operatorInfo.rewardAddress) {
-        this.splitWalletError = '沒有獎勵地址，無法查詢 Split Wallet 資料'
-        return
-      }
-
-      this.splitWalletLoading = true
-      this.splitWalletError = null
-
-      try {
-        console.log('Fetching split wallet address for:', this.operatorInfo.rewardAddress)
-        const address = await ether_obol.getObolOperatorSplitWallets(this.operatorInfo.rewardAddress)
-        this.splitWalletAddress = address
-        console.log('Split wallet address received:', address)
-        
-        // 自動載入 Reward Share 資料
-        if (address) {
-          this.fetchRewardShareData(address)
-        }
-      } catch (error) {
-        console.error('Error fetching split wallet address:', error)
-        this.splitWalletError = `載入失敗: ${error.message || '未知錯誤'}`
-      } finally {
-        this.splitWalletLoading = false
+      await this.fetchSplitWalletDataWithProgress()
+      
+      // 自動載入 Reward Share 資料
+      if (this.splitWalletAddress) {
+        this.fetchRewardShareData(this.splitWalletAddress)
       }
     },
     
-    // Reward Share 相關方法
+    // Reward Share 相關方法（用於手動刷新）
     async fetchRewardShareData(splitWalletAddress) {
-      this.rewardShareLoading = true
-      this.rewardShareError = null
-      
-      try {
-        console.log('Fetching reward share data for split wallet:', splitWalletAddress)
-        const data = await ether_obol.getObolOperatorRewardshare(splitWalletAddress)
-        this.rewardShareData = data
-        console.log('Reward share data received:', data)
-      } catch (error) {
-        console.error('Error fetching reward share data:', error)
-        this.rewardShareError = `載入失敗: ${error.message || '未知錯誤'}`
-      } finally {
-        this.rewardShareLoading = false
-      }
+      await this.fetchRewardShareDataWithProgress(splitWalletAddress)
     },
     
     // 計算分潤百分比
@@ -387,7 +525,412 @@ export default {
       
       const etherscanUrl = `https://etherscan.io/address/${address}`
       window.open(etherscanUrl, '_blank')
+    },
+
+    // 載入進度相關方法
+    async startLoadingSequence(data) {
+      this.isPageLoading = true
+      this.loadingProgress = 0
+      this.resetLoadingSteps()
+
+      try {
+        // 步驟 1: 初始化操作者資訊
+        await this.executeLoadingStep('初始化操作者資訊', async () => {
+          this.initializeData(data)
+          await this.delay(500) // 模擬載入時間
+        })
+
+        // 步驟 2: 載入 Split Wallet 地址
+        await this.executeLoadingStep('載入 Split Wallet 地址', async () => {
+          await this.fetchSplitWalletDataWithProgress()
+        })
+
+        // 步驟 3: 載入分潤配置資料
+        await this.executeLoadingStep('載入分潤配置資料', async () => {
+          if (this.splitWalletAddress) {
+            await this.fetchRewardShareDataWithProgress(this.splitWalletAddress)
+          } else {
+            await this.delay(300) // 如果沒有地址，短暫延遲
+          }
+        })
+
+        // 步驟 4: 初始化所有圖表
+        await this.executeLoadingStep('初始化所有圖表', async () => {
+          await this.initializeAllCharts()
+        })
+
+        // 完成載入
+        this.loadingProgress = 100
+        await this.delay(500) // 顯示100%一會兒
+        this.isPageLoading = false
+
+      } catch (error) {
+        console.error('載入序列失敗:', error)
+        // 即使有錯誤也要顯示頁面
+        this.isPageLoading = false
+      }
+    },
+
+    resetLoadingSteps() {
+      this.loadingSteps.forEach(step => {
+        step.completed = false
+      })
+      this.currentLoadingStep = ''
+    },
+
+    async executeLoadingStep(stepName, asyncFunction) {
+      this.currentLoadingStep = stepName
+      
+      try {
+        await asyncFunction()
+        
+        // 標記步驟完成
+        const step = this.loadingSteps.find(s => s.name === stepName)
+        if (step) {
+          step.completed = true
+        }
+        
+        // 更新進度
+        const completedSteps = this.loadingSteps.filter(s => s.completed).length
+        this.loadingProgress = (completedSteps / this.loadingSteps.length) * 100
+        
+        this.currentLoadingStep = ''
+        await this.delay(200) // 步驟間短暫停頓
+        
+      } catch (error) {
+        console.error(`執行載入步驟失敗: ${stepName}`, error)
+        // 即使失敗也標記為完成，繼續下一步
+        const step = this.loadingSteps.find(s => s.name === stepName)
+        if (step) {
+          step.completed = true
+        }
+        this.currentLoadingStep = ''
+      }
+    },
+
+    delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms))
+    },
+
+    async fetchSplitWalletDataWithProgress() {
+      if (!this.operatorInfo.rewardAddress) {
+        this.splitWalletError = '沒有獎勵地址，無法查詢 Split Wallet 資料'
+        return
+      }
+
+      this.splitWalletLoading = true
+      this.splitWalletError = null
+
+      try {
+        const address = await ether_obol.getObolOperatorSplitWallets(this.operatorInfo.rewardAddress)
+        this.splitWalletAddress = address
+      } catch (error) {
+        console.error('Error fetching split wallet address:', error)
+        this.splitWalletError = `載入失敗: ${error.message || '未知錯誤'}`
+      } finally {
+        this.splitWalletLoading = false
+      }
+    },
+    
+    async fetchRewardShareDataWithProgress(splitWalletAddress) {
+      this.rewardShareLoading = true
+      this.rewardShareError = null
+      
+      try {
+        const data = await ether_obol.getObolOperatorRewardshare(splitWalletAddress)
+        this.rewardShareData = data
+      } catch (error) {
+        console.error('Error fetching reward share data:', error)
+        this.rewardShareError = `載入失敗: ${error.message || '未知錯誤'}`
+      } finally {
+        this.rewardShareLoading = false
+      }
+    },
+    
+    async loadChartDataWithProgress() {
+      // 使用統一的載入邏輯
+      await this.loadChartData()
+    },
+
+    // ========== 多圖表實例方法 ==========
+    
+    // 初始化所有圖表
+    async initializeAllCharts() {
+      if (!this.operatorId) {
+        console.warn('沒有操作者 ID，跳過圖表初始化')
+        return
+      }
+
+      console.log('🚀 開始初始化所有圖表')
+      this.chartsInitializing = true
+      this.chartsProgress = 0
+
+      try {
+        let completedCount = 0
+
+        // 並行載入所有圖表數據
+        const promises = this.availablePeriods.map(async (period) => {
+          try {
+            console.log(`📊 載入圖表: ${period.label}`)
+            this.charts[period.value].loading = true
+            this.charts[period.value].error = null
+            
+            const data = await ether_obol.getObolOperatorHistoryValidators(this.operatorId, period.value)
+            this.charts[period.value].data = data
+            this.charts[period.value].loading = false
+            
+            console.log(`✅ 圖表載入成功: ${period.label}`)
+          } catch (error) {
+            console.error(`❌ 圖表載入失敗: ${period.label}`, error)
+            this.charts[period.value].error = `載入失敗: ${error.message}`
+            this.charts[period.value].loading = false
+          }
+          
+          completedCount++
+          this.chartsProgress = (completedCount / this.availablePeriods.length) * 100
+        })
+
+        await Promise.all(promises)
+        
+        // 等待 DOM 更新後渲染圖表
+        this.$nextTick(() => {
+          this.renderAllCharts()
+        })
+
+        console.log('🎉 所有圖表初始化完成')
+      } catch (error) {
+        console.error('圖表初始化失敗:', error)
+      } finally {
+        this.chartsInitializing = false
+        this.chartsProgress = 100
+      }
+    },
+
+    // 載入單個圖表數據
+    async loadChartData(period) {
+      if (!this.operatorId) {
+        this.charts[period].error = '沒有操作者 ID'
+        return
+      }
+
+      console.log(`📊 載入圖表數據: ${period}`)
+      this.charts[period].loading = true
+      this.charts[period].error = null
+
+      try {
+        const data = await ether_obol.getObolOperatorHistoryValidators(this.operatorId, period)
+        this.charts[period].data = data
+        this.charts[period].loading = false
+        
+        console.log(`✅ 圖表載入成功: ${period}`)
+        
+        // 渲染圖表
+        this.$nextTick(() => {
+          this.renderChart(period)
+        })
+        
+      } catch (error) {
+        console.error(`❌ 圖表載入失敗: ${period}`, error)
+        this.charts[period].error = `載入失敗: ${error.message}`
+        this.charts[period].loading = false
+      }
+    },
+
+    // 渲染所有圖表
+    renderAllCharts() {
+      console.log('🎯 開始渲染所有圖表')
+      this.availablePeriods.forEach(period => {
+        if (this.charts[period.value].data && !this.charts[period.value].loading) {
+          this.renderChart(period.value)
+        }
+      })
+    },
+
+    // 渲染單個圖表
+    renderChart(period) {
+      console.log(`🎯 開始渲染圖表: ${period}`)
+      
+      // 基本檢查
+      if (!Chart) {
+        this.charts[period].error = 'Chart.js 未載入'
+        return
+      }
+
+      const chartData = this.charts[period].data
+      if (!chartData || !chartData.length) {
+        console.log(`⚠️ 沒有數據，跳過渲染: ${period}`)
+        return
+      }
+
+      const canvas = this.$refs[`chartCanvas_${period}`]
+      if (!canvas || !canvas[0]) {
+        console.log(`⚠️ Canvas 不存在，延遲渲染: ${period}`)
+        setTimeout(() => this.renderChart(period), 100)
+        return
+      }
+
+      try {
+        // 清理舊圖表
+        this.destroyChart(period)
+
+        // 確保 Canvas 可見
+        const canvasElement = canvas[0]
+        canvasElement.style.display = 'block'
+        canvasElement.style.width = '100%'
+        canvasElement.style.height = '100%'
+
+        // 準備數據
+        const { labels, datasets } = this.prepareChartData(chartData)
+        
+        // 創建新圖表
+        const ctx = canvasElement.getContext('2d')
+        this.charts[period].instance = new Chart(ctx, {
+          type: 'line',
+          data: { labels, datasets },
+          options: this.getChartOptions()
+        })
+
+        console.log(`🎉 圖表渲染成功: ${period}`)
+
+      } catch (error) {
+        console.error(`❌ 圖表渲染失敗: ${period}`, error)
+        this.charts[period].error = `渲染失敗: ${error.message}`
+      }
+    },
+
+    // 數據準備方法
+    prepareChartData(chartData) {
+      const labels = chartData.map(item => {
+        const date = new Date(item.timestamp)
+        return date.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })
+      })
+
+      const totalAddedData = chartData.map(item => 
+        Math.max(0, Number(item.data?.totalAddedValidators) || 0)
+      )
+      const totalDepositedData = chartData.map(item => 
+        Math.max(0, Number(item.data?.totalDepositedValidators) || 0)
+      )
+      const totalExitedData = chartData.map(item => 
+        Math.max(0, Number(item.data?.totalExitedValidators) || 0)
+      )
+
+      const datasets = [
+        {
+          label: '總添加驗證器',
+          data: totalAddedData,
+          borderColor: '#3B82F6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 2,
+          fill: false
+        },
+        {
+          label: '已啟動驗證器', 
+          data: totalDepositedData,
+          borderColor: '#10B981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          borderWidth: 2,
+          fill: false
+        },
+        {
+          label: '已退出驗證器',
+          data: totalExitedData,
+          borderColor: '#9CA3AF',
+          backgroundColor: 'rgba(156, 163, 175, 0.1)',
+          borderWidth: 2,
+          fill: false
+        }
+      ]
+
+      return { labels, datasets }
+    },
+    
+    // 5. 圖表配置
+    getChartOptions() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, position: 'top' },
+          tooltip: { mode: 'index', intersect: false }
+        },
+        scales: {
+          x: { display: true, grid: { display: false } },
+          y: { display: true, beginAtZero: true }
+        },
+        interaction: { mode: 'index', intersect: false }
+      }
+    },
+
+    // 清理圖表實例
+    destroyChart(period) {
+      if (period && this.charts[period] && this.charts[period].instance) {
+        try {
+          this.charts[period].instance.destroy()
+          console.log(`🧹 清理圖表實例: ${period}`)
+        } catch (error) {
+          console.warn(`清理圖表時出錯: ${period}`, error)
+        }
+        this.charts[period].instance = null
+      }
+    },
+
+    // 清理所有圖表實例
+    destroyAllCharts() {
+      console.log('🧹 清理所有圖表實例')
+      this.availablePeriods.forEach(period => {
+        this.destroyChart(period.value)
+      })
+    },
+
+    // 獲取圖表狀態摘要
+    getChartsStatusSummary() {
+      let loaded = 0, loading = 0, error = 0
+      
+      this.availablePeriods.forEach(period => {
+        const chart = this.charts[period.value]
+        if (chart.loading) loading++
+        else if (chart.error) error++
+        else if (chart.data) loaded++
+      })
+      
+      return { loaded, loading, error, total: this.availablePeriods.length }
+    },
+
+    // 切換時間維度
+    switchPeriod(period) {
+      if (this.selectedPeriod === period) {
+        return // 避免重複切換
+      }
+      
+      console.log(`🔄 切換時間維度: ${this.selectedPeriod} -> ${period}`)
+      this.selectedPeriod = period
+      
+      // 如果該時間維度的數據尚未載入，則載入數據
+      if (!this.charts[period].data && !this.charts[period].loading) {
+        this.loadChartData(period)
+      }
+    },
+
+    // 重新創建特定圖表
+    recreateChart(period) {
+      console.log(`🔄 重新創建圖表: ${period}`)
+      this.destroyChart(period)
+      if (this.charts[period].data) {
+        this.$nextTick(() => {
+          this.renderChart(period)
+        })
+      }
     }
+  },
+
+  mounted() {
+    console.log('📱 OperatorDetail 組件已掛載')
+  },
+
+  beforeUnmount() {
+    console.log('🧹 OperatorDetail 組件即將卸載，清理所有圖表實例')
+    this.destroyAllCharts()
   }
 }
 </script>
@@ -398,6 +941,235 @@ export default {
   min-height: 100vh;
   background: var(--bg-primary);
   padding: 0;
+  position: relative;
+}
+
+/* 載入進度畫面 */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-container {
+  background: white;
+  border-radius: 20px;
+  padding: 48px 40px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  max-width: 480px;
+  width: 90%;
+  text-align: center;
+}
+
+.loading-header {
+  margin-bottom: 32px;
+}
+
+.loading-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  color: var(--brand-primary);
+  animation: float 3s ease-in-out infinite;
+}
+
+.loading-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.loading-subtitle {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* 進度條 */
+.progress-section {
+  margin-bottom: 32px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-secondary));
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+.progress-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand-primary);
+}
+
+/* 載入步驟 */
+.loading-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loading-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.loading-step.current {
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.loading-step.completed {
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.step-indicator {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.step-indicator svg {
+  color: var(--success);
+}
+
+.step-loading {
+  width: 16px;
+  height: 16px;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-top: 2px solid var(--brand-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.step-pending {
+  width: 8px;
+  height: 8px;
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 50%;
+}
+
+.step-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step-text {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.loading-step.current .step-text {
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+.loading-step.completed .step-text {
+  color: var(--success);
+}
+
+/* 圖表初始化進度條樣式 */
+.charts-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.charts-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.charts-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-secondary));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.charts-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+.charts-progress-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand-primary);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* 動畫 */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Top Overview Section */
@@ -1038,6 +1810,268 @@ export default {
   50% { opacity: 0.5; }
 }
 
+/* Historical Trends Section - 切換式圖表 */
+.historical-trends-section {
+  margin-bottom: 32px;
+  padding: 0 24px;
+}
+
+.trends-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.trends-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* 圖表標題和控制區域 */
+.chart-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.header-left {
+  flex: 1;
+  min-width: 200px;
+}
+
+.chart-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.chart-status {
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-status.loading {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--brand-primary);
+}
+
+.chart-status.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.chart-status.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.chart-status.empty {
+  background: rgba(156, 163, 175, 0.1);
+  color: var(--text-muted);
+}
+
+/* 時間維度選擇器 */
+.period-selector {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 10px;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.period-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  white-space: nowrap;
+}
+
+.period-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--brand-primary);
+}
+
+.period-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.period-btn.active {
+  background: var(--brand-primary);
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.period-btn.loading {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--brand-primary);
+}
+
+.btn-loading-indicator {
+  width: 12px;
+  height: 12px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.status-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.loading-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.5s infinite;
+}
+
+/* 圖表容器 */
+.chart-container {
+  height: 400px;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin: 24px;
+}
+
+.chart-canvas {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+/* 圖表狀態 */
+.chart-loading, .chart-error, .chart-empty {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  padding: 40px 20px;
+  background: var(--bg-secondary);
+}
+
+.loading-spinner-large {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(59, 130, 246, 0.3);
+  border-top: 3px solid var(--brand-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.loading-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.loading-text p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.loading-text small {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.chart-error .error-icon,
+.chart-empty .empty-icon {
+  font-size: 32px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+.chart-error p,
+.chart-empty p {
+  margin: 0 0 20px 0;
+  font-size: 16px;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.error-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.retry-btn {
+  padding: 8px 16px;
+  background: var(--brand-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.retry-btn:hover {
+  background: var(--brand-secondary);
+  transform: translateY(-1px);
+}
+
+.debug-btn {
+  padding: 8px 16px;
+  background: rgba(156, 163, 175, 0.1);
+  color: var(--text-secondary);
+  border: 1px solid rgba(156, 163, 175, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.debug-btn:hover {
+  background: rgba(156, 163, 175, 0.2);
+  color: var(--text-primary);
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
   .stats-overview-section {
@@ -1059,7 +2093,8 @@ export default {
   }
   
   .split-wallet-section,
-  .reward-share-section {
+  .reward-share-section,
+  .historical-trends-section {
     padding: 0 20px;
   }
   
@@ -1071,6 +2106,21 @@ export default {
   .operator-info {
     margin-left: 0;
     margin-top: 16px;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .period-selector {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .chart-container {
+    height: 320px;
   }
 }
 
@@ -1084,7 +2134,8 @@ export default {
   }
   
   .split-wallet-section,
-  .reward-share-section {
+  .reward-share-section,
+  .historical-trends-section {
     padding: 0 16px;
   }
   
@@ -1115,6 +2166,27 @@ export default {
     align-items: flex-start;
     gap: 8px;
   }
+
+  .chart-header {
+    padding: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .period-selector {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .period-btn {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+
+  .chart-container {
+    height: 280px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1122,7 +2194,8 @@ export default {
   .stats-overview-section,
   .contract-address-section,
   .split-wallet-section,
-  .reward-share-section {
+  .reward-share-section,
+  .historical-trends-section {
     padding-left: 16px;
     padding-right: 16px;
   }
@@ -1150,6 +2223,58 @@ export default {
   
   .share-address-info {
     margin-bottom: 8px;
+  }
+
+  .chart-header {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .chart-title {
+    font-size: 20px;
+  }
+
+  .period-selector {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .period-btn {
+    flex: 1;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
+  .chart-container {
+    height: 250px;
+    margin: 16px;
+  }
+
+  /* 載入畫面響應式 */
+  .loading-container {
+    padding: 32px 24px;
+    max-width: 400px;
+  }
+
+  .loading-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .loading-title {
+    font-size: 20px;
+  }
+
+  .loading-subtitle {
+    font-size: 14px;
+  }
+
+  .loading-steps {
+    gap: 8px;
+  }
+
+  .loading-step {
+    padding: 6px;
   }
 }
 </style> 
