@@ -35,6 +35,7 @@
           </div>
         </div>
       </div>
+      <button v-if="overviewStartIndex + 3 < allDelegatorTotals.length" class="overview-next-btn" @click="nextOverview">下一個</button>
     </section>
 
     <!-- Divider -->
@@ -44,7 +45,7 @@
     <section class="distribution-section">
       <div class="distribution-title">本週 Reward 變動</div>
       <div class="distribution-grid">
-        <div v-for="card in distributionCards" :key="card.id" class="distribution-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
+        <div v-for="card in distributionCards.slice(distributionStartIndex, distributionStartIndex+4)" :key="card.id" class="distribution-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
           <div class="card-header">
             <div class="card-title-section">
               <div class="card-icon">
@@ -104,6 +105,7 @@
             </div>
           </div>
         </div>
+        <button v-if="distributionStartIndex + 4 < distributionCards.length" class="distribution-next-btn" @click="nextDistribution">下一個</button>
       </div>
     </section>
     <!-- Divider between distribution and summary -->
@@ -126,7 +128,7 @@
           <thead>
             <tr>
               <th @click="sortLog('timestamp')">時間 <span v-if="logSort==='timestamp'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
-              <th @click="sortLog('name')">名稱/ID <span v-if="logSort==='name'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
+              <th @click="sortLog('name')">ID <span v-if="logSort==='name'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
               <th @click="sortLog('amount')">金額 <span v-if="logSort==='amount'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
               <th @click="sortLog('epoch_counter')">Epoch <span v-if="logSort==='epoch_counter'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
             </tr>
@@ -160,23 +162,11 @@ export default {
   name: 'Flow',
   data() {
     return {
-      overviewCards: [ // 顯示 Delegator 總額
-        {
-          label: 'Delegator #2 總獎勵',
-          amount: 0, 
-          change: 27.01,
-        },
-        {
-          label: 'Delegator #3 總獎勵',
-          amount: 0, 
-          change: -1.23,
-        },
-        {
-          label: 'Delegator #4 總獎勵',
-          amount: 0, 
-          change: 54.00,
-        },
+      overviewCards: [], // 動態產生 Delegator 卡片
+      allDelegatorTotals: [
+        // { label: 'Delegator #2 總獎勵', amount: 0, change: 0, delegatorId: 2 }, ...
       ],
+      overviewStartIndex: 0,
       distributionCards: [ // 顯示本周新增內容
         {
           id: 'node',
@@ -211,6 +201,7 @@ export default {
           epochCounter: 0,
         }
       ],
+      distributionStartIndex: 0,
       summaryStats: {
         thisWeekTotal: 0,
         lastWeekTotal: 0,
@@ -232,7 +223,7 @@ export default {
     filteredLog() {
       let arr = (this.rawLog || []);
       // 週篩選
-      if (this.selectedWeek) {
+      if (this.selectedWeek && this.selectedWeek !== 'all') {
         const [start, end] = this.selectedWeek.split('|');
         arr = arr.filter(row => row.timestamp >= start && row.timestamp <= end+'T23:59:59');
       }
@@ -262,49 +253,57 @@ export default {
     }
   },
   async mounted() { // 跟Api server進行交互
-    const res = await fetch('http://localhost:8081/api/rewards');
+    const res = await fetch('http://localhost:8081/api/rewards/all');
     const data = await res.json();
 
-    // 1. 設定 Delegator 總額
-    const delegator = data.find(item => item.type === 'Delegator');
-    if (delegator) {
-      this.overviewCards[0].amount = delegator.delegator_total2;
-      this.overviewCards[1].amount = delegator.delegator_total3;
-      this.overviewCards[2].amount = delegator.delegator_total4;
-    }
+    // 1. 依照日期分組
+    const groupedByDate = {};
+    data.forEach(item => {
+      const date = item.timestamp.split('T')[0];
+      if (!groupedByDate[date]) groupedByDate[date] = [];
+      groupedByDate[date].push(item);
+    });
+    const allDates = Object.keys(groupedByDate).sort().reverse();
+    const thisWeekDate = allDates[0];
+    const lastWeekDate = allDates[1];
+    const thisWeekData = thisWeekDate ? groupedByDate[thisWeekDate] : [];
+    const lastWeekData = lastWeekDate ? groupedByDate[lastWeekDate] : [];
 
-    // 2. 取得本週（最新 timestamp）
-    const latestTimestamp = data.length > 0 ? data[0].timestamp : null;
-    // 3. 取得上週（次新 timestamp）
-    let lastWeekTimestamp = null;
-    if (latestTimestamp) {
-      // 找出所有不同的 timestamp，排序取次新
-      const timestamps = [...new Set(data.map(item => item.timestamp))].sort().reverse();
-      if (timestamps.length > 1) {
-        lastWeekTimestamp = timestamps[1];
-      }
-    }
+    // 2. 動態產生所有 Delegator 卡片
+    const delegatorTotals = [];
+    const thisWeekDelegators = thisWeekData.filter(item => item.type === 'Delegator');
+    const lastWeekDelegators = lastWeekData.filter(item => item.type === 'Delegator');
+    thisWeekDelegators.forEach(now => {
+      const last = lastWeekDelegators.find(lw => lw.delegator_id === now.delegator_id);
+      delegatorTotals.push({
+        label: `Delegator #${now.delegator_id} 總獎勵`,
+        amount: now[`delegator_total${now.delegator_id}`],
+        change: last ? (now[`delegator_total${now.delegator_id}`] - last[`delegator_total${now.delegator_id}`]) : 0,
+        delegatorId: now.delegator_id
+      });
+    });
+    this.allDelegatorTotals = delegatorTotals;
+    this.overviewStartIndex = 0;
+    this.updateOverviewCards();
 
-    // 4. 取得上週資料
-    const lastWeekData = lastWeekTimestamp ? data.filter(item => item.timestamp === lastWeekTimestamp) : [];
-    // 4.1 取得上週的 delegator_total2/3/4
+    // 3. 設定 Delegator 總額
+    const delegatorNow = thisWeekData.find(item => item.type === 'Delegator');
+    if (delegatorNow) {
+      this.overviewCards[0].amount = delegatorNow.delegator_total2;
+      this.overviewCards[1].amount = delegatorNow.delegator_total3;
+      this.overviewCards[2].amount = delegatorNow.delegator_total4;
+    }
+    // 4. 取得上週的 delegator_total2/3/4
     let lastTotal2 = 0, lastTotal3 = 0, lastTotal4 = 0;
-    if (lastWeekData.length > 0) {
-      const lastDelegator = lastWeekData.find(item => item.type === 'Delegator');
-      if (lastDelegator) {
-        lastTotal2 = lastDelegator.delegator_total2;
-        lastTotal3 = lastDelegator.delegator_total3;
-        lastTotal4 = lastDelegator.delegator_total4;
-      }
+    const delegatorLast = lastWeekData.find(item => item.type === 'Delegator');
+    if (delegatorLast) {
+      lastTotal2 = delegatorLast.delegator_total2;
+      lastTotal3 = delegatorLast.delegator_total3;
+      lastTotal4 = delegatorLast.delegator_total4;
     }
-    // 4.1 取得本週資料
-    const thisWeekData = latestTimestamp ? data.filter(item => item.timestamp === latestTimestamp) : [];
-
-    // 計算本週所有 reward（Node + Delegator）總和
+    // 5. 計算本週/上週 reward 總和
     const thisWeekTotal = thisWeekData.reduce((sum, item) => sum + (item.amount || 0), 0);
-    // 計算上週所有 reward（Node + Delegator）總和
     const lastWeekTotal = lastWeekData.reduce((sum, item) => sum + (item.amount || 0), 0);
-    // 計算增長百分比
     let growthRate = 0;
     if (lastWeekTotal !== 0) {
       growthRate = ((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100;
@@ -316,26 +315,25 @@ export default {
       lastWeekTotal,
       growthRate,
     };
+    // 6. 設定 overviewCards 的 change
+    this.overviewCards[0].change = (delegatorNow && delegatorLast) ? (delegatorNow.delegator_total2 - lastTotal2) : 0;
+    this.overviewCards[1].change = (delegatorNow && delegatorLast) ? (delegatorNow.delegator_total3 - lastTotal3) : 0;
+    this.overviewCards[2].change = (delegatorNow && delegatorLast) ? (delegatorNow.delegator_total4 - lastTotal4) : 0;
 
-    // 5. 設定 overviewCards 的 change
-    this.overviewCards[0].change = delegator && lastWeekData.length > 0 ? (delegator.delegator_total2 - lastTotal2) : 0;
-    this.overviewCards[1].change = delegator && lastWeekData.length > 0 ? (delegator.delegator_total3 - lastTotal3) : 0;
-    this.overviewCards[2].change = delegator && lastWeekData.length > 0 ? (delegator.delegator_total4 - lastTotal4) : 0;
-
-    // 6. 設定 distributionCards 的 amount、epochCounter、change
+    // 7. 設定 distributionCards 的 amount、epochCounter、change
     this.distributionCards.forEach(card => {
       let now, last;
       if (card.delegatorId === 'NODE') {
-        now = data.find(item => item.type === 'Node');
+        now = thisWeekData.find(item => item.type === 'Node');
         last = lastWeekData.find(item => item.type === 'Node');
       } else if (card.delegatorId === 'DEL-002') {
-        now = data.find(item => item.type === 'Delegator' && item.delegator_id === 2);
+        now = thisWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 2);
         last = lastWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 2);
       } else if (card.delegatorId === 'DEL-003') {
-        now = data.find(item => item.type === 'Delegator' && item.delegator_id === 3);
+        now = thisWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 3);
         last = lastWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 3);
       } else if (card.delegatorId === 'DEL-004') {
-        now = data.find(item => item.type === 'Delegator' && item.delegator_id === 4);
+        now = thisWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 4);
         last = lastWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 4);
       }
       if (now) {
@@ -366,18 +364,22 @@ export default {
     // 取得完整 log
     this.rawLog = data.map((row, idx) => ({...row, _logKey: row.timestamp+'-'+(row.type==='Node'?row.node_id:row.delegator_id)+'-'+idx}));
     // 產生週選單
-    const allDates = Array.from(new Set(this.rawLog.map(r => r.timestamp.split('T')[0]))).sort().reverse();
+    const allLogDates = Array.from(new Set(this.rawLog.map(r => r.timestamp.split('T')[0]))).sort().reverse();
     const weekList = [];
-    for (let i = 0; i < Math.min(6, allDates.length); i++) {
-      const start = allDates[i];
-      const end = allDates[i];
+    // 新增 All 選項
+    weekList.push({ value: 'all', label: '全部' });
+    for (let i = 0; i < Math.min(6, allLogDates.length); i++) {
+      const start = allLogDates[i];
+      const end = allLogDates[i];
       weekList.push({
         value: `${start}|${end}`,
         label: i === 0 ? '本週' : (i === 1 ? '上週' : `上上週${i>2?`(-${i-1})`:''}`) + `（${start}）`
       });
     }
     this.weekOptions = weekList;
-    this.selectedWeek = weekList[0]?.value || '';
+    // 預設選擇「本週」
+    const thisWeek = weekList.find(w => w.label === '本週');
+    this.selectedWeek = thisWeek ? thisWeek.value : (weekList[0]?.value || '');
   },
   methods: {
     addCardHover(event) {
@@ -430,27 +432,22 @@ export default {
       }
     },
     exportCSV() {
-      // 欄位順序與表格一致
-      const header = ['時間', '名稱/ID', '金額', 'Epoch'];
-      const rows = this.filteredLog.map(row => [
-        row.timestamp.split('T')[0],
-        row.type==='Node' ? 'Node' : ('Delegator #' + row.delegator_id),
-        (row.amount>0?'+':'') + this.formatAmount(row.amount),
-        row.epoch_counter
-      ]);
-      let csv = header.join(',') + '\n';
-      csv += rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-      const blob = new Blob([csv], {type: 'text/csv'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'reward_log.csv';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(()=>{
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
+      // 取得目前週期參數
+      const week = this.selectedWeek;
+      const url = `http://localhost:8081/api/rewards/export?week=${encodeURIComponent(week)}`;
+      fetch(url)
+        .then(res => res.blob())
+        .then(blob => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'reward_log.csv';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+          }, 100);
+        });
     },
     toggleLogExpand() {
       this.logExpanded = !this.logExpanded;
@@ -465,6 +462,20 @@ export default {
       // 只顯示2筆時，讓第2筆漸隱
       if (this.displayedLog.length === 2 && idx === 1) return { opacity: 0.7 };
       return {};
+    },
+    updateOverviewCards() {
+      this.overviewCards = this.allDelegatorTotals.slice(this.overviewStartIndex, this.overviewStartIndex + 3);
+    },
+    nextOverview() {
+      if (this.overviewStartIndex + 3 < this.allDelegatorTotals.length) {
+        this.overviewStartIndex++;
+        this.updateOverviewCards();
+      }
+    },
+    nextDistribution() {
+      if (this.distributionStartIndex + 4 < this.distributionCards.length) {
+        this.distributionStartIndex++;
+      }
     },
   }
 }
@@ -578,8 +589,8 @@ export default {
 .overview-card .main-amount,
 .distribution-card .main-amount {
   font-size: 36px;
-  font-weight: 900;
-  color: #fff;
+  font-weight: 950;
+  color: var(--text-primary);
   letter-spacing: 1.2px;
   text-shadow: 0 2px 12px rgba(126,182,255,0.08), 0 1px 2px rgba(179,170,255,0.06);
   transition: transform 0.18s cubic-bezier(.4,2,.6,1);
@@ -641,7 +652,7 @@ export default {
   border: 1.5px solid rgba(0, 0, 0, 0.12);
   border-radius: var(--border-radius);
   box-shadow: 0 6px 24px rgba(59, 130, 246, 0.10), 0 1.5px 6px rgba(0,0,0,0.08);
-  padding: 24px 20px;
+  padding: 26px 22px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -649,9 +660,9 @@ export default {
   transition: box-shadow 0.3s cubic-bezier(.4,2,.6,1), border 0.3s cubic-bezier(.4,2,.6,1);
   position: relative;
   overflow: visible;
-  min-height: 180px;
-  height: 180px;
-  max-width: 260px;
+  min-height: 200px;
+  height: 200px;
+  max-width: 280px;
   margin: 0 auto;
 }
 
@@ -747,13 +758,13 @@ export default {
   justify-content: space-between;
 }
 
-.distribution-card .main-amount {
+.distribution-card .main-amount {  
   font-size: 32px;
   font-weight: 900;
   color: var(--text-primary);
   line-height: 1.1;
-  margin-bottom: -5px;
-  margin-top: 20px;
+  margin-bottom: -12px;  
+  margin-top: 28px;
   text-align: left;
   min-height: 38px;
   display: flex;
@@ -774,7 +785,7 @@ export default {
   flex-direction: row;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 22px;
+  margin-top: 36px;
 }
 
 .distribution-card .detail-row {
@@ -1224,5 +1235,43 @@ export default {
   background: linear-gradient(180deg, rgba(36,40,54,0) 0%, var(--bg-card) 90%);
   border-radius: 0 0 12px 12px;
   z-index: 2;
+}
+.overview-next-btn {
+  height: 48px;
+  min-width: 48px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  border: none;
+  margin-left: 16px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(126,182,255,0.10);
+  transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+}
+.overview-next-btn:hover {
+  background: linear-gradient(90deg, var(--brand-secondary) 0%, var(--brand-primary) 100%);
+  box-shadow: 0 4px 16px rgba(126,182,255,0.18);
+  transform: translateY(-2px) scale(1.04);
+}
+.distribution-next-btn {
+  height: 48px;
+  min-width: 48px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  border: none;
+  margin-left: 16px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(126,182,255,0.10);
+  transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+}
+.distribution-next-btn:hover {
+  background: linear-gradient(90deg, var(--brand-secondary) 0%, var(--brand-primary) 100%);
+  box-shadow: 0 4px 16px rgba(126,182,255,0.18);
+  transform: translateY(-2px) scale(1.04);
 }
 </style> 

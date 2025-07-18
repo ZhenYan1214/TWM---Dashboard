@@ -6,6 +6,7 @@
       <header class="dashboard-header">
         <div class="dashboard-title-row">
           <div class="dashboard-title">
+            <img src="./assets/TWM2.png" alt="Logo" class="dashboard-logo" />
             {{ currentDashboard === 'flow' ? 'Flow Reward Dashboard' : 'Obol Reward Dashboard' }}
           </div>
           <div class="dashboard-switcher">
@@ -19,7 +20,26 @@
             >Obol</button>
           </div>
         </div>
-        <div class="theme-toggle" @click="toggleTheme">
+        <div class="theme-toggle" @click="toggleTheme" style="display: flex; align-items: center; gap: 10px;">
+          <!-- 顯眼主題圖示 -->
+          <span class="theme-icon-large">
+            <svg v-if="isDarkMode" width="32" height="32" viewBox="0 0 24 24" :style="{ fill: 'var(--brand-secondary)', filter: 'drop-shadow(0 2px 6px rgba(99,102,241,0.25))' }">
+              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+            </svg>
+            <svg v-else width="32" height="32" viewBox="0 0 24 24" :style="{ fill: 'var(--brand-primary)', filter: 'drop-shadow(0 2px 6px rgba(59,130,246,0.18))' }">
+              <circle cx="12" cy="12" r="5" stroke="var(--brand-primary)" stroke-width="2.5" fill="#fff"/>
+              <g stroke="var(--brand-primary)" stroke-width="2">
+                <line x1="12" y1="2" x2="12" y2="4"/>
+                <line x1="12" y1="20" x2="12" y2="22"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="2" y1="12" x2="4" y2="12"/>
+                <line x1="20" y1="12" x2="22" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              </g>
+            </svg>
+          </span>
           <div class="toggle-switch" :class="{ 'active': isDarkMode }">
             <div class="toggle-icon">
               <svg v-if="isDarkMode" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -93,14 +113,8 @@ export default {
     }
   },
   mounted() {
-    // 從 localStorage 讀取主題設置
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      this.isDarkMode = savedTheme === 'dark';
-    } else {
-      // 如果沒有保存的設置，使用系統偏好
-      this.isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
+    // 強制預設為黑色主題
+    this.isDarkMode = true;
     this.applyTheme();
   }
 }
@@ -223,23 +237,37 @@ body::-webkit-scrollbar-thumb:hover {
 .dashboard-switcher {
   display: flex;
   gap: 10px;
+  align-items: center;
+  margin-top: 5px;
 }
 
 .switch-btn {
   background: none;
-  border: none;
+  border: 1.5px solid rgba(120,130,140,0.18);
   color: var(--text-muted);
   cursor: pointer;
-  padding: 8px 16px;
-  border-radius: 6px;
+  padding: 8px 20px;
+  border-radius: 10px;
   transition: all 0.2s ease;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.04);
+  margin-right: 8px;
 }
-
+.switch-btn:last-child {
+  margin-right: 0;
+}
 .switch-btn.active {
   background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
-  color: var(--text-primary);
+  color: #fff;
+  border-color: var(--brand-secondary);
+  box-shadow: 0 4px 16px rgba(99,102,241,0.08);
+}
+.switch-btn:hover:not(.active) {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background: rgba(59,130,246,0.04);
 }
 
 .theme-toggle {
@@ -278,6 +306,26 @@ body::-webkit-scrollbar-thumb:hover {
 .toggle-switch.active .toggle-icon {
   transform: translateX(22px);
   color: var(--brand-primary);
+}
+
+.theme-icon-large {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  transition: color 0.3s, filter 0.3s;
+}
+.theme-toggle:hover .theme-icon-large {
+  filter: drop-shadow(0 4px 12px rgba(59,130,246,0.25));
+}
+
+.dashboard-logo {
+  height: 42px;
+  width: auto;
+  margin-right: 10px;
+  margin-top: -6px;
+  vertical-align: middle;
+  display: inline-block;
 }
 
 /* Responsive Design */
