@@ -12,22 +12,37 @@ const SplitMainInterface = new ethers.Interface([{"inputs":[],"stateMutability":
 
 
 
-const EtherscanAPIKey = "RKFRN7F2EGCMFWPMVTX5RE4ZIQ7E1RHJXI";
-const RPC_URL = "https://convincing-divine-slug.quiknode.pro/9e835fa839e702f4140f3a80b65672cfb3d5950b/";
+// 從環境變數獲取配置，如果沒有則使用預設值
+const EtherscanAPIKey = import.meta.env.VITE_ETHERSCAN_API_KEY || "RKFRN7F2EGCMFWPMVTX5RE4ZIQ7E1RHJXI";
+const RPC_URL = import.meta.env.VITE_RPC_URL || "https://convincing-divine-slug.quiknode.pro/9e835fa839e702f4140f3a80b65672cfb3d5950b/";
+const SECONDS_PER_BLOCK = Number(import.meta.env.VITE_SECONDS_PER_BLOCK) || 12;              // 主網平均
+const BLOCKS_PER_DAY    = 86_400 / SECONDS_PER_BLOCK;
+
+// 配置載入日誌（僅在開發模式下顯示）
+if (import.meta.env.DEV) {
+  console.log('🔧 Obol 工具配置:', {
+    SECONDS_PER_BLOCK,
+    BATCH_SIZE: Number(import.meta.env.VITE_BATCH_SIZE) || 8,
+    BATCH_DELAY: Number(import.meta.env.VITE_BATCH_DELAY) || 1000,
+    CHART_BATCH_SIZE: Number(import.meta.env.VITE_CHART_BATCH_SIZE) || 6,
+    CHART_BATCH_DELAY: Number(import.meta.env.VITE_CHART_BATCH_DELAY) || 1000,
+    RPC_URL: RPC_URL.substring(0, 50) + '...',
+    ETHERSCAN_API_KEY: EtherscanAPIKey ? '✅ 已設置' : '❌ 未設置'
+  });
+}
+
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const etherscanProvider = new ethers.EtherscanProvider('homestead',EtherscanAPIKey);
 const ObolOperatorClustersRegistryContract = new ethers.Contract(ObolOperatorClustersRegistry, fullABI, provider);
-const SECONDS_PER_BLOCK = 12;              // 主網平均
-const BLOCKS_PER_DAY    = 86_400 / SECONDS_PER_BLOCK;
 
 
-// 請求節流配置
-const BATCH_SIZE = 8; // 每批最多8個請求
-const BATCH_DELAY = 1000; // 批次間延遲1秒
+// 請求節流配置 - 從環境變數獲取
+const BATCH_SIZE = Number(import.meta.env.VITE_BATCH_SIZE) || 8; // 每批最多8個請求
+const BATCH_DELAY = Number(import.meta.env.VITE_BATCH_DELAY) || 1000; // 批次間延遲1秒
 
 // 圖表數據專用的併發配置（適應 QuickNode 15 req/sec 限制）
-const CHART_BATCH_SIZE = 6; // 圖表數據每批最多6個區塊（12個請求：6個 getNodeOperator + 6個 getBlock）
-const CHART_BATCH_DELAY = 1000; // 圖表數據批次間延遲1秒，確保不超過 14 req/sec
+const CHART_BATCH_SIZE = Number(import.meta.env.VITE_CHART_BATCH_SIZE) || 6; // 圖表數據每批最多6個區塊
+const CHART_BATCH_DELAY = Number(import.meta.env.VITE_CHART_BATCH_DELAY) || 1000; // 圖表數據批次間延遲1秒
 
 // 延遲函數
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -138,7 +153,7 @@ export const ether_obol = {
     const PERIOD_CONFIG = {
       '1m': {days: 30, stepDays: 3},
       '1y': {days: 365, stepDays: 30},
-      'all': {days: 730, stepDays: 50} // 'all' 設為 2 年，每 30 天一個數據點
+      'all': {days: 720, stepDays: 60} // 'all' 設為 2 年，每 30 天一個數據點
     };
 
     const { days, stepDays } = PERIOD_CONFIG[period];
@@ -258,11 +273,195 @@ export const ether_obol = {
     }
   },
 
-  getObolPredictedRewardShare: async (operatorAddress) => {
-    const operatorContract = new ethers.Contract(operatorAddress, ObolOperatorABI, provider);
-    const splitWallet = await operatorContract.splitWallet();
-    const rewardShare = await ether_obol.getObolOperatorRewardshare(splitWallet);
-    return rewardShare;
+  getObolOperatorTokenTx: async (splitWallet) => {
+    const url = `https://api.etherscan.io/api?module=account&action=tokentx&address=${splitWallet}&startblock=0&endblock=99999999&sort=desc&apikey=${EtherscanAPIKey}`;
+    console.log('Fetching transactions for split wallet:', splitWallet);
+    const transactions = await fetch(url).then(res => res.json()).then(data => data.result);
+    const tokenTx = transactions.find(tx => tx.input.startsWith("0xe4fc6b6d"));
+    return tokenTx;
   },
+
+  // 獲取 wstETH 代幣詳細交易記錄
+  getObolOperatorWstETHTransactions: async (splitWallet) => {
+    try {
+      console.log('🔍 開始載入 wstETH 交易記錄:', splitWallet);
+      
+      const url = `https://api.etherscan.io/api?module=account&action=tokentx&address=${splitWallet}&startblock=0&endblock=99999999&sort=desc&apikey=${EtherscanAPIKey}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status !== '1') {
+        throw new Error(`Etherscan API 錯誤: ${data.message}`);
+      }
+      
+      const transactions = data.result || [];
+      
+      // wstETH 合約地址 (主網)
+      const WSTETH_CONTRACT = '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0';
+      
+      // 過濾 wstETH 交易
+      const wstETHTransactions = transactions.filter(tx => 
+        tx.contractAddress && tx.contractAddress.toLowerCase() === WSTETH_CONTRACT.toLowerCase()
+      );
+      
+      console.log(`📊 找到 ${wstETHTransactions.length} 筆 wstETH 交易`);
+      
+      // 處理交易數據，區分收入和支出
+      const processedTransactions = wstETHTransactions.map(tx => {
+        const value = parseFloat(tx.value) / Math.pow(10, parseInt(tx.tokenDecimal || 18));
+        const isIncoming = tx.to.toLowerCase() === splitWallet.toLowerCase();
+        
+        return {
+          hash: tx.hash,
+          timeStamp: parseInt(tx.timeStamp),
+          from: tx.from,
+          to: tx.to,
+          value: value,
+          valueWei: tx.value,
+          isIncoming: isIncoming,
+          blockNumber: parseInt(tx.blockNumber),
+          date: new Date(parseInt(tx.timeStamp) * 1000).toISOString().split('T')[0],
+          tokenName: tx.tokenName,
+          tokenSymbol: tx.tokenSymbol,
+          tokenDecimal: tx.tokenDecimal
+        };
+      });
+      
+      return processedTransactions.sort((a, b) => b.timeStamp - a.timeStamp);
+      
+    } catch (error) {
+      console.error('❌ 載入 wstETH 交易記錄失敗:', error);
+      throw error;
+    }
+  },
+
+  // 統計 wstETH 數據
+  getObolOperatorWstETHSummary: async (splitWallet) => {
+    try {
+      console.log('📈 開始統計 wstETH 數據:', splitWallet);
+      
+      const transactions = await ether_obol.getObolOperatorWstETHTransactions(splitWallet);
+      
+      // 計算總收入、總支出和餘額
+      let totalReceived = 0;
+      let totalDistributed = 0;
+      let transactionCount = 0;
+      
+      const monthlyData = {};
+      
+      transactions.forEach(tx => {
+        if (tx.isIncoming) {
+          totalReceived += tx.value;
+        } else {
+          totalDistributed += tx.value;
+        }
+        transactionCount++;
+        
+        // 按月份統計
+        const monthKey = tx.date.substring(0, 7); // YYYY-MM 格式
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = {
+            received: 0,
+            distributed: 0,
+            transactions: 0
+          };
+        }
+        
+        if (tx.isIncoming) {
+          monthlyData[monthKey].received += tx.value;
+        } else {
+          monthlyData[monthKey].distributed += tx.value;
+        }
+        monthlyData[monthKey].transactions++;
+      });
+      
+      const currentBalance = totalReceived - totalDistributed;
+      
+      // 轉換月度數據為圖表格式
+      const monthlyChartData = Object.keys(monthlyData)
+        .sort()
+        .map(month => ({
+          month: month,
+          date: new Date(month + '-01'),
+          received: monthlyData[month].received,
+          distributed: monthlyData[month].distributed,
+          net: monthlyData[month].received - monthlyData[month].distributed,
+          transactions: monthlyData[month].transactions
+        }));
+      
+      console.log(`✅ wstETH 數據統計完成: 總收入 ${totalReceived.toFixed(6)} wstETH`);
+      
+      return {
+        totalReceived: totalReceived,
+        totalDistributed: totalDistributed,
+        currentBalance: currentBalance,
+        transactionCount: transactionCount,
+        transactions: transactions,
+        monthlyData: monthlyChartData,
+        lastUpdated: new Date().toISOString(),
+        
+        // 預留收益預估數據結構（邏輯留空）
+        estimatedEarnings: {
+          daily: null,      // 預估日收益
+          monthly: null,    // 預估月收益
+          yearly: null,     // 預估年收益
+          apy: null,        // 年化收益率
+          nextDistribution: null, // 下次分配預估時間
+          // 此處可由用戶自行實現收益預估邏輯
+        }
+      };
+      
+    } catch (error) {
+      console.error('❌ 統計 wstETH 數據失敗:', error);
+      throw error;
+    }
+  },
+
+  getPridictionWstETH: async (lidoapr, activeValidators, type, isComputable, latestTimestamp) => {
+    const share = (type == "Obol" ? 0.07 : 0.08)
+    if(isComputable){
+      const revenue = lidoapr * activeValidators * share * 32 
+      const revenuePerSecond = revenue / 365 / 24 / 60 / 60
+      const diffSeconds = (Date.now()/1000) - latestTimestamp
+      const result = revenuePerSecond * diffSeconds
+      return result
+    }
+  },
+
+  getLidoProtocolAPR: async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_LIDO_API_BASE_URL || 'https://eth-api.lido.fi';
+      const url = `${baseUrl}/v1/protocol/steth/apr/sma`;
+      const response = await fetch(url);
+      const data = await response.json();
+      console.log('Lido protocol APR 原始數據:', data);
+      
+      // 解析 APR 數據
+      let apr = null;
+      if (data.data.aprs && Array.isArray(data.data.aprs) && data.data.aprs.length > 0) {
+        const latestAPR = data.data.aprs[data.data.aprs.length - 1];
+        if (latestAPR && latestAPR.apr !== undefined) {
+          apr = Number(latestAPR.apr);
+          console.log('✅ 從 aprs 陣列獲取最新 APR:', apr);
+        }
+      }
+      
+      
+      // 轉換為小數形式 (API 返回的可能是百分比形式)
+      if (apr !== null) {
+        // 如果 API 返回的是百分比形式 (例如 2.672)，轉換為小數形式 (0.02672)
+        const finalAPR = apr > 1 ? apr / 100 : apr;
+        console.log('✅ 最終 APR (小數形式):', finalAPR);
+        return finalAPR;
+      }
+      
+      throw new Error('無法從 API 回應中解析 APR 數據');
+      
+    } catch (error) {
+      console.error('❌ 獲取 Lido Protocol APR 失敗:', error);
+      throw error;
+    }
+  }
+
 
 }

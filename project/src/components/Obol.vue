@@ -6,8 +6,9 @@
         <div class="card-header">
           <div class="card-icon">
             <svg :width="24" :height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path v-if="card.label === '活躍 Clusters'" d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/>
-              <path v-else-if="card.label === '總驗證器數量'" d="M20 6L9 17L4 12"/>
+              <path v-if="card.label === 'Clusters'" d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/>
+              <path v-else-if="card.label === 'Total Validators'" d="M20 6L9 17L4 12"/>
+              <path v-else-if="card.label === 'Lido Protocol APR'" d="M3 3v18h18M8 17l4-4 4 4 4-4M7 8h3v3H7zM17 12h3v3h-3z"/>
               <path v-else d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z"/>
             </svg>
           </div>
@@ -143,6 +144,10 @@ export default {
       error: null,
       clusterCards: [],
       loadingProgress: '',
+      // Lido APR 相關數據
+      lidoAPR: null,
+      lidoAPRLoading: false,
+      lidoAPRError: null,
       // 快取配置
       cacheKey: 'obol_clusters_data',
       cacheExpiryTime: 5 * 60 * 1000, // 5分鐘快取過期時間
@@ -168,6 +173,13 @@ export default {
           unit: '個',
           status: totalValidators > 0 ? 'healthy' : 'error',
           statusText: totalValidators > 0 ? '活躍' : '無活動'
+        },
+        {
+          label: 'Lido Protocol APR',
+          amount: this.lidoAPRLoading ? '載入中' : this.lidoAPRError ? 'N/A' : this.lidoAPR ? `${(this.lidoAPR * 100).toFixed(2)}` : 'N/A',
+          unit: this.lidoAPRLoading || this.lidoAPRError || !this.lidoAPR ? '' : '%',
+          status: this.lidoAPRLoading ? 'info' : this.lidoAPRError ? 'error' : this.lidoAPR ? 'healthy' : 'warning',
+          statusText: this.lidoAPRLoading ? '載入中' : this.lidoAPRError ? '載入失敗' : this.lidoAPR ? '即時 APR' : '無數據'
         }
       ]
     },
@@ -184,11 +196,33 @@ export default {
     }
   },
   async mounted() {
-    await this.loadObolData()
+    // 並行載入 Obol 數據和 Lido APR
+    await Promise.all([
+      this.loadObolData(),
+      this.loadLidoAPR()
+    ])
   },
-  methods: {
-    // 檢查快取是否有效
-    isCacheValid() {
+      methods: {
+      // 載入 Lido Protocol APR
+      async loadLidoAPR() {
+        this.lidoAPRLoading = true
+        this.lidoAPRError = null
+        
+        try {
+          console.log('🚀 開始載入 Lido Protocol APR')
+          const apr = await ether_obol.getLidoProtocolAPR()
+          this.lidoAPR = apr
+          console.log('✅ Lido APR 載入成功:', `${(apr * 100).toFixed(2)}%`)
+        } catch (error) {
+          console.error('❌ Lido APR 載入失敗:', error)
+          this.lidoAPRError = '載入失敗'
+        } finally {
+          this.lidoAPRLoading = false
+        }
+      },
+
+      // 檢查快取是否有效
+      isCacheValid() {
       try {
         const cachedData = sessionStorage.getItem(this.cacheKey)
         const cacheTimestamp = sessionStorage.getItem(`${this.cacheKey}_timestamp`)
@@ -318,7 +352,10 @@ export default {
     // 強制重新整理資料
     async refreshData() {
       this.clearCache()
-      await this.fetchObolData(true)
+      await Promise.all([
+        this.fetchObolData(true),
+        this.loadLidoAPR()
+      ])
     },
     
     getClusterStatus(operator) {
@@ -375,7 +412,8 @@ export default {
 <style scoped>
 /* Overview Section */
 .overview-section {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
   margin-bottom: 32px;
 }
@@ -832,7 +870,7 @@ export default {
 
 @media (max-width: 1024px) {
   .overview-section {
-    flex-direction: column;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 16px;
   }
   
@@ -848,6 +886,11 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .overview-section {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
   .overview-card {
     padding: 20px 16px;
   }
