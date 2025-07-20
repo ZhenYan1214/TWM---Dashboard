@@ -12,6 +12,15 @@
           </div>
           <h2 class="loading-title">載入操作者資料</h2>
           <p class="loading-subtitle">正在準備 Operator #{{ operatorId }} 的詳細資訊</p>
+          
+          <!-- 取消按鈕 -->
+          <button @click="cancelLoading" class="cancel-loading-btn" title="取消載入並返回 Obol 列表">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            返回列表
+          </button>
         </div>
 
         <!-- 進度條 -->
@@ -19,7 +28,10 @@
           <div class="progress-bar">
             <div class="progress-fill" :style="{ width: loadingProgress + '%' }"></div>
           </div>
-          <div class="progress-text">{{ Math.round(loadingProgress) }}%</div>
+          <div class="progress-info">
+            <div class="progress-text">{{ Math.round(loadingProgress) }}%</div>
+            <div class="progress-hint">點擊下方「返回列表」可隨時返回 Obol 頁面</div>
+          </div>
         </div>
 
         <!-- 載入步驟 -->
@@ -255,6 +267,160 @@
       </div>
     </section>
 
+    <!-- wstETH Token 收益統計 Section -->
+    <section class="wsteth-rewards-section">
+      <div class="wsteth-rewards-card">
+        <div class="section-header">
+          <div class="section-icon wsteth-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+          </div>
+          <div class="section-content">
+            <h3 class="section-title">wstETH 收益統計</h3>
+            <p class="section-description" v-if="wstETHLoading">正在載入 wstETH 收益數據...</p>
+            <p class="section-description" v-else-if="wstETHError">{{ wstETHError }}</p>
+            <p class="section-description" v-else-if="wstETHSummary">
+              共 {{ incomingTransactionsCount }} 筆收入記錄
+            </p>
+            <p class="section-description" v-else>等待 Split Wallet 地址載入</p>
+          </div>
+          <div class="refresh-button" @click="refreshWstETHData" v-if="!wstETHLoading && splitWalletAddress" title="重新載入數據">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6M1 20v-6h6"/>
+              <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+            </svg>
+            重新載入
+          </div>
+          <div class="loading-indicator" v-if="wstETHLoading">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 2l-2 2m-7.61 2.61L18 12l-2.39 7.39L12 18l-7.39 2.39L6 18l-6-6 6-1.39L8.61 6.61"/>
+            </svg>
+            載入中
+          </div>
+        </div>
+
+        <!-- wstETH 統計卡片 -->
+        <div v-if="wstETHSummary && !wstETHLoading" class="wsteth-stats-cards">
+          <div class="stats-card total-received">
+            <div class="card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/>
+              </svg>
+            </div>
+            <div class="card-content">
+              <div class="card-label">總收到 wstETH</div>
+              <div class="card-value">{{ formatWstETHAmount(wstETHSummary.totalReceived) }}</div>
+              <div class="card-unit">wstETH</div>
+            </div>
+          </div>
+
+          <div class="stats-card transaction-count">
+            <div class="card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14,2 14,8 20,8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10,9 9,9 8,9"/>
+              </svg>
+            </div>
+            <div class="card-content">
+              <div class="card-label">收入記錄筆數</div>
+              <div class="card-value">{{ incomingTransactionsCount }}</div>
+              <div class="card-unit">筆</div>
+            </div>
+          </div>
+
+          <!-- 收益預估卡片 -->
+          <div class="stats-card estimated-earnings">
+            <div class="card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="1" x2="12" y2="23"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+            <div class="card-content">
+              <div class="card-label">目前預估收益</div>
+              <div class="card-value" :class="{ 
+                'estimated': predictedWstETH === null || predictionError,
+                'error': predictionError 
+              }">
+                {{ formatPredictionResult() }}
+              </div>
+              <div class="card-unit">wstETH</div>
+            </div>
+            <div class="estimation-note" v-if="predictionError">
+              無法預估(沒有分潤紀錄)
+            </div>
+            <div class="estimation-note" v-else-if="predictedWstETH === null">
+              {{ getOperatorType() }} {{ lidoAPR ? '(APR: ' + (lidoAPR * 100).toFixed(2) + '%)' : '' }}
+            </div>
+            <div class="estimation-note" v-else>
+              基於 {{ getOperatorType() }} (APR: {{ (lidoAPR * 100).toFixed(2) }}%)
+            </div>
+          </div>
+        </div>
+
+        <!-- 交易記錄列表 -->
+        <div v-if="incomingTransactions && incomingTransactions.length > 0" class="wsteth-transactions">
+          <div class="transactions-header">
+            <h4 class="transactions-title">收入記錄</h4>
+            <span class="transactions-count">{{ incomingTransactions.length }} 筆收入</span>
+          </div>
+          
+          <div class="transactions-list">
+            <div v-for="(tx, index) in (showAllTransactions ? incomingTransactions : incomingTransactions.slice(0, 10))" 
+                 :key="tx.hash" 
+                 class="transaction-item">
+              <div class="tx-info">
+                <div class="tx-type incoming">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12l7 7 7-7"/>
+                  </svg>
+                  收入
+                </div>
+                <div class="tx-date">{{ new Date(tx.timeStamp * 1000).toLocaleString('zh-TW') }}</div>
+              </div>
+              
+              <div class="tx-amount incoming">
+                <span class="amount-value">
+                  +{{ formatWstETHAmount(tx.value) }}
+                </span>
+                <span class="amount-unit">wstETH</span>
+              </div>
+              
+              <div class="tx-hash" @click="openEtherscanTx(tx.hash)" title="在 Etherscan 中查看交易">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15,3 21,3 21,9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                {{ tx.hash.substring(0, 10) }}...
+              </div>
+            </div>
+          </div>
+          
+          <div v-if="incomingTransactions.length > 10" class="show-more-transactions">
+            <button class="show-more-btn" @click="showAllTransactions = !showAllTransactions">
+              {{ showAllTransactions ? '收起' : `查看全部 ${incomingTransactions.length} 筆收入記錄` }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else-if="!wstETHLoading && !wstETHError" class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          <p class="empty-message">尚未載入 wstETH 收入記錄</p>
+          <p class="empty-description">等待 Split Wallet 地址載入後自動獲取收入資訊</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Historical Trends Section - 切換式圖表 -->
     <section class="historical-trends-section">
       <div class="trends-card">
@@ -354,6 +520,10 @@ export default {
     operatorData: {
       type: Object,
       required: true
+    },
+    operatorType: {
+      type: String,
+      default: 'Obol' // 預設為 Obol，可以是 'Obol' 或 'SSV'
     }
   },
   data() {
@@ -379,6 +549,16 @@ export default {
       rewardShareData: null,
       rewardShareLoading: false,
       rewardShareError: null,
+      // wstETH Token 相關數據
+      wstETHSummary: null,
+      wstETHTransactions: null,
+      wstETHLoading: false,
+      wstETHError: null,
+      showAllTransactions: false,
+      // 收益預測相關數據
+      lidoAPR: null,
+      predictedWstETH: null,
+      predictionError: null,
       // Chart 相關數據 - 重構為多圖表實例
       charts: {
         '1m': { data: null, loading: false, error: null, instance: null },
@@ -397,10 +577,12 @@ export default {
       // 頁面載入進度
       isPageLoading: true,
       loadingProgress: 0,
+      loadingCancelled: false, // 載入取消標誌
       loadingSteps: [
         { name: '初始化操作者資訊', completed: false },
         { name: '載入 Split Wallet 地址', completed: false },
         { name: '載入分潤配置資料', completed: false },
+        { name: '載入 wstETH 收益數據', completed: false },
         { name: '初始化所有圖表', completed: false }
       ],
       currentLoadingStep: ''
@@ -414,6 +596,19 @@ export default {
     selectedPeriodText() {
       const period = this.availablePeriods.find(p => p.value === this.selectedPeriod)
       return period ? period.label : '未知'
+    },
+
+    // 過濾出收入交易記錄
+    incomingTransactions() {
+      if (!this.wstETHTransactions || !Array.isArray(this.wstETHTransactions)) {
+        return []
+      }
+      return this.wstETHTransactions.filter(tx => tx.isIncoming === true)
+    },
+
+    // 計算收入交易筆數
+    incomingTransactionsCount() {
+      return this.incomingTransactions.length
     },
 
     overviewCards() {
@@ -527,10 +722,19 @@ export default {
       window.open(etherscanUrl, '_blank')
     },
 
+    // 跳轉到 Etherscan 交易頁面
+    openEtherscanTx(txHash) {
+      if (!txHash) return
+      
+      const etherscanUrl = `https://etherscan.io/tx/${txHash}`
+      window.open(etherscanUrl, '_blank')
+    },
+
     // 載入進度相關方法
     async startLoadingSequence(data) {
       this.isPageLoading = true
       this.loadingProgress = 0
+      this.loadingCancelled = false // 重置取消標誌
       this.resetLoadingSteps()
 
       try {
@@ -540,10 +744,16 @@ export default {
           await this.delay(500) // 模擬載入時間
         })
 
+        // 檢查是否已取消
+        if (this.loadingCancelled) return
+
         // 步驟 2: 載入 Split Wallet 地址
         await this.executeLoadingStep('載入 Split Wallet 地址', async () => {
           await this.fetchSplitWalletDataWithProgress()
         })
+
+        // 檢查是否已取消
+        if (this.loadingCancelled) return
 
         // 步驟 3: 載入分潤配置資料
         await this.executeLoadingStep('載入分潤配置資料', async () => {
@@ -554,20 +764,45 @@ export default {
           }
         })
 
-        // 步驟 4: 初始化所有圖表
+        // 檢查是否已取消
+        if (this.loadingCancelled) return
+
+        // 步驟 4: 載入 wstETH 收益數據
+        await this.executeLoadingStep('載入 wstETH 收益數據', async () => {
+          if (this.splitWalletAddress) {
+            await this.fetchWstETHDataWithProgress(this.splitWalletAddress)
+          } else {
+            await this.delay(300) // 如果沒有地址，短暫延遲
+          }
+        })
+
+        // 檢查是否已取消
+        if (this.loadingCancelled) return
+
+        // 步驟 5: 初始化所有圖表
         await this.executeLoadingStep('初始化所有圖表', async () => {
           await this.initializeAllCharts()
         })
 
+        // 檢查是否已取消
+        if (this.loadingCancelled) return
+
         // 完成載入
         this.loadingProgress = 100
         await this.delay(500) // 顯示100%一會兒
-        this.isPageLoading = false
+        
+        // 最後檢查是否已取消
+        if (!this.loadingCancelled) {
+          this.isPageLoading = false
+        }
 
       } catch (error) {
         console.error('載入序列失敗:', error)
-        // 即使有錯誤也要顯示頁面
-        this.isPageLoading = false
+        
+        // 如果不是因為取消而失敗，顯示頁面
+        if (!this.loadingCancelled) {
+          this.isPageLoading = false
+        }
       }
     },
 
@@ -579,10 +814,22 @@ export default {
     },
 
     async executeLoadingStep(stepName, asyncFunction) {
+      // 檢查是否已取消載入
+      if (this.loadingCancelled) {
+        console.log('⏹️ 載入已取消，跳過步驟:', stepName, '- 用戶選擇返回 Obol 列表')
+        return
+      }
+      
       this.currentLoadingStep = stepName
       
       try {
         await asyncFunction()
+        
+        // 再次檢查是否已取消（異步操作完成後）
+        if (this.loadingCancelled) {
+          console.log('⏹️ 載入已取消，停止處理步驟結果:', stepName, '- 返回 Obol 列表')
+          return
+        }
         
         // 標記步驟完成
         const step = this.loadingSteps.find(s => s.name === stepName)
@@ -599,6 +846,13 @@ export default {
         
       } catch (error) {
         console.error(`執行載入步驟失敗: ${stepName}`, error)
+        
+        // 檢查是否為取消導致的錯誤
+        if (this.loadingCancelled) {
+          console.log('⏹️ 載入已取消，不處理錯誤:', stepName, '- 用戶返回 Obol 列表')
+          return
+        }
+        
         // 即使失敗也標記為完成，繼續下一步
         const step = this.loadingSteps.find(s => s.name === stepName)
         if (step) {
@@ -608,11 +862,67 @@ export default {
       }
     },
 
+    // 取消載入
+    cancelLoading() {
+      console.log('🚫 用戶取消載入操作，返回 Obol 列表')
+      
+      // 設置取消標誌
+      this.loadingCancelled = true
+      
+      // 立即隱藏載入畫面
+      this.isPageLoading = false
+      
+      // 重置載入狀態
+      this.resetLoadingState()
+      
+      // 發送事件返回 Obol 畫面
+      this.$emit('go-back')
+    },
+
+    // 重置載入狀態
+    resetLoadingState() {
+      this.loadingProgress = 0
+      this.currentLoadingStep = ''
+      this.loadingCancelled = false
+      this.resetLoadingSteps()
+      
+      // 重置所有載入狀態
+      this.splitWalletLoading = false
+      this.rewardShareLoading = false
+      this.wstETHLoading = false
+      this.chartsInitializing = false
+      
+      // 清理圖表載入狀態
+      Object.keys(this.charts).forEach(period => {
+        this.charts[period].loading = false
+      })
+    },
+
     delay(ms) {
-      return new Promise(resolve => setTimeout(resolve, ms))
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          if (this.loadingCancelled) {
+            reject(new Error('Loading cancelled'))
+          } else {
+            resolve()
+          }
+        }, ms)
+        
+        // 如果載入已經被取消，立即清理定時器
+        if (this.loadingCancelled) {
+          clearTimeout(timer)
+          reject(new Error('Loading cancelled'))
+        }
+      })
     },
 
     async fetchSplitWalletDataWithProgress() {
+      // 檢查是否已取消載入
+      if (this.loadingCancelled) {
+        console.log('⏹️ 載入已取消，跳過 Split Wallet 載入 - 返回 Obol 列表')
+        return
+      }
+
       if (!this.operatorInfo.rewardAddress) {
         this.splitWalletError = '沒有獎勵地址，無法查詢 Split Wallet 資料'
         return
@@ -623,27 +933,217 @@ export default {
 
       try {
         const address = await ether_obol.getObolOperatorSplitWallets(this.operatorInfo.rewardAddress)
+        
+        // 檢查請求完成後是否已取消
+        if (this.loadingCancelled) {
+          console.log('⏹️ 載入已取消，忽略 Split Wallet 結果 - 返回 Obol 列表')
+          return
+        }
+        
         this.splitWalletAddress = address
       } catch (error) {
-        console.error('Error fetching split wallet address:', error)
-        this.splitWalletError = `載入失敗: ${error.message || '未知錯誤'}`
+        if (!this.loadingCancelled) {
+          console.error('Error fetching split wallet address:', error)
+          this.splitWalletError = `載入失敗: ${error.message || '未知錯誤'}`
+        }
       } finally {
-        this.splitWalletLoading = false
+        if (!this.loadingCancelled) {
+          this.splitWalletLoading = false
+        }
       }
     },
     
     async fetchRewardShareDataWithProgress(splitWalletAddress) {
+      // 檢查是否已取消載入
+      if (this.loadingCancelled) {
+        console.log('⏹️ 載入已取消，跳過分潤資料載入 - 返回 Obol 列表')
+        return
+      }
+
       this.rewardShareLoading = true
       this.rewardShareError = null
       
       try {
         const data = await ether_obol.getObolOperatorRewardshare(splitWalletAddress)
+        
+        // 檢查請求完成後是否已取消
+        if (this.loadingCancelled) {
+          console.log('⏹️ 載入已取消，忽略分潤資料結果 - 返回 Obol 列表')
+          return
+        }
+        
         this.rewardShareData = data
       } catch (error) {
-        console.error('Error fetching reward share data:', error)
-        this.rewardShareError = `載入失敗: ${error.message || '未知錯誤'}`
+        if (!this.loadingCancelled) {
+          console.error('Error fetching reward share data:', error)
+          this.rewardShareError = `載入失敗: ${error.message || '未知錯誤'}`
+        }
       } finally {
-        this.rewardShareLoading = false
+        if (!this.loadingCancelled) {
+          this.rewardShareLoading = false
+        }
+      }
+    },
+
+    // wstETH 數據載入方法
+    async fetchWstETHDataWithProgress(splitWalletAddress) {
+      // 檢查是否已取消載入
+      if (this.loadingCancelled) {
+        console.log('⏹️ 載入已取消，跳過 wstETH 數據載入 - 返回 Obol 列表')
+        return
+      }
+
+      this.wstETHLoading = true
+      this.wstETHError = null
+      this.predictionError = null
+      
+      try {
+        console.log('🚀 開始載入 wstETH 數據:', splitWalletAddress)
+        
+        // 同時載入摘要數據和 Lido APR
+        const [summaryData, lidoAPR] = await Promise.all([
+          ether_obol.getObolOperatorWstETHSummary(splitWalletAddress),
+          ether_obol.getLidoProtocolAPR().catch(error => {
+            console.warn('Lido APR 載入失敗:', error)
+            return null
+          })
+        ])
+        
+        // 檢查請求完成後是否已取消
+        if (this.loadingCancelled) {
+          console.log('⏹️ 載入已取消，忽略 wstETH 數據結果 - 返回 Obol 列表')
+          return
+        }
+        
+        this.wstETHSummary = summaryData
+        this.wstETHTransactions = summaryData.transactions || []
+        this.lidoAPR = lidoAPR
+        
+        // 計算收益預測
+        try {
+          await this.calculateWstETHPrediction(summaryData.transactions || [])
+        } catch (predictionError) {
+          if (!this.loadingCancelled) {
+            console.warn('收益預測計算失敗:', predictionError)
+            this.predictionError = predictionError.message
+          }
+        }
+        
+        if (!this.loadingCancelled) {
+          console.log('✅ wstETH 數據載入成功')
+        }
+      } catch (error) {
+        if (!this.loadingCancelled) {
+          console.error('❌ wstETH 數據載入失敗:', error)
+          this.wstETHError = `載入失敗: ${error.message || '未知錯誤'}`
+        }
+      } finally {
+        if (!this.loadingCancelled) {
+          this.wstETHLoading = false
+        }
+      }
+    },
+
+    // 計算 wstETH 收益預測
+    async calculateWstETHPrediction(transactions) {
+      try {
+        console.log('📊 開始計算收益預測')
+        
+        // 檢查必要參數
+        if (!this.lidoAPR) {
+          throw new Error('Lido APR 尚未載入')
+        }
+        
+        // 獲取活躍驗證器數量
+        const activeValidators = this.operatorInfo.totalDepositedValidators || 0
+        
+        // 判斷是否可計算（是否有交易記錄）
+        const incomingTxs = transactions.filter(tx => tx.isIncoming === true)
+        const isComputable = incomingTxs.length > 0
+        
+        // 獲取最新一筆交易的時間戳
+        let latestTimestamp = null
+        if (isComputable && incomingTxs.length > 0) {
+          // 交易已按時間排序，取第一筆（最新的）
+          latestTimestamp = incomingTxs[0].timeStamp
+        }
+        
+        console.log('📋 預測參數:', {
+          lidoAPR: this.lidoAPR,
+          activeValidators: activeValidators,
+          operatorType: this.operatorType,
+          isComputable: isComputable,
+          latestTimestamp: latestTimestamp,
+          incomingTransactionsCount: incomingTxs.length
+        })
+        
+        // 調用預測函數
+        const prediction = await ether_obol.getPridictionWstETH(
+          this.lidoAPR,
+          activeValidators,
+          this.operatorType,
+          isComputable,
+          latestTimestamp
+        )
+        
+        this.predictedWstETH = prediction
+        
+        if (prediction !== null && prediction !== undefined) {
+          console.log('✅ 收益預測計算成功:', prediction)
+        } else {
+          console.log('ℹ️ 收益預測結果為空（可能因為不可計算）')
+        }
+        
+      } catch (error) {
+        console.error('❌ 收益預測計算失敗:', error)
+        this.predictionError = error.message
+        throw error
+      }
+    },
+
+    // 手動重新載入 wstETH 數據
+    async refreshWstETHData() {
+      if (this.splitWalletAddress) {
+        console.log('🔄 手動重新載入 wstETH 數據和預測')
+        await this.fetchWstETHDataWithProgress(this.splitWalletAddress)
+      }
+    },
+
+    // 格式化 wstETH 數量
+    formatWstETHAmount(amount) {
+      if (!amount || amount === 0) return '0'
+      if (amount < 0.001) return amount.toFixed(8)
+      if (amount < 1) return amount.toFixed(6)
+      return amount.toFixed(4)
+    },
+
+    // 格式化預測結果
+    formatPredictionResult() {
+      if (this.predictionError) {
+        return '計算失敗'
+      }
+      
+      if (this.predictedWstETH === null || this.predictedWstETH === undefined) {
+        return '無法計算'
+      }
+      
+      return this.formatWstETHAmount(this.predictedWstETH)
+    },
+
+    // 獲取操作者類型
+    getOperatorType() {
+      return this.operatorType || 'Obol'
+    },
+
+    // 計算收益率（預留邏輯）
+    calculateYield() {
+      // 這裡預留給用戶實現收益計算邏輯
+      console.log('💡 收益計算邏輯預留給用戶實現')
+      return {
+        daily: null,
+        monthly: null,
+        yearly: null,
+        apy: null
       }
     },
     
@@ -929,8 +1429,16 @@ export default {
   },
 
   beforeUnmount() {
-    console.log('🧹 OperatorDetail 組件即將卸載，清理所有圖表實例')
+    console.log('🧹 OperatorDetail 組件即將卸載，清理所有資源並返回 Obol 列表')
+    
+    // 取消任何正在進行的載入
+    this.loadingCancelled = true
+    
+    // 清理圖表實例
     this.destroyAllCharts()
+    
+    // 重置載入狀態
+    this.resetLoadingState()
   }
 }
 </script>
@@ -951,7 +1459,7 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -959,10 +1467,11 @@ export default {
 }
 
 .loading-container {
-  background: white;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
   border-radius: 20px;
   padding: 48px 40px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg, 0 20px 40px rgba(0, 0, 0, 0.1));
   max-width: 480px;
   width: 90%;
   text-align: center;
@@ -1001,7 +1510,7 @@ export default {
 .progress-bar {
   width: 100%;
   height: 8px;
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--progress-bg, rgba(59, 130, 246, 0.1));
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 12px;
@@ -1026,10 +1535,24 @@ export default {
   animation: shimmer 2s infinite;
 }
 
+.progress-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
 .progress-text {
   font-size: 14px;
   font-weight: 600;
   color: var(--brand-primary);
+}
+
+.progress-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  opacity: 0.8;
+  font-weight: 400;
 }
 
 /* 載入步驟 */
@@ -1049,12 +1572,12 @@ export default {
 }
 
 .loading-step.current {
-  background: rgba(59, 130, 246, 0.05);
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: var(--step-current-bg, rgba(59, 130, 246, 0.05));
+  border: 1px solid var(--step-current-border, rgba(59, 130, 246, 0.2));
 }
 
 .loading-step.completed {
-  background: rgba(16, 185, 129, 0.05);
+  background: var(--step-completed-bg, rgba(16, 185, 129, 0.05));
 }
 
 .step-indicator {
@@ -1124,7 +1647,7 @@ export default {
 .charts-progress-bar {
   flex: 1;
   height: 4px;
-  background: rgba(59, 130, 246, 0.1);
+  background: var(--progress-bg, rgba(59, 130, 246, 0.1));
   border-radius: 2px;
   overflow: hidden;
 }
@@ -1170,6 +1693,112 @@ export default {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* 取消載入按鈕 */
+.cancel-loading-btn {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background: var(--cancel-btn-bg, rgba(239, 68, 68, 0.1));
+  border: 1px solid var(--cancel-btn-border, rgba(239, 68, 68, 0.3));
+  color: var(--cancel-btn-color, #ef4444);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cancel-loading-btn:hover {
+  background: var(--cancel-btn-hover-bg, rgba(239, 68, 68, 0.2));
+  border-color: var(--cancel-btn-hover-border, rgba(239, 68, 68, 0.5));
+  color: var(--cancel-btn-hover-color, #dc2626);
+  transform: translateY(-1px);
+  box-shadow: var(--cancel-btn-hover-shadow, 0 4px 12px rgba(239, 68, 68, 0.2));
+}
+
+.cancel-loading-btn:active {
+  transform: translateY(0);
+  box-shadow: var(--cancel-btn-active-shadow, 0 2px 6px rgba(239, 68, 68, 0.15));
+}
+
+.cancel-loading-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.cancel-loading-btn:hover svg {
+  transform: rotate(90deg);
+}
+
+/* 深色模式支援 */
+@media (prefers-color-scheme: dark) {
+  .loading-overlay {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-card: #1e293b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.4);
+    
+    /* 進度條深色模式 */
+    --progress-bg: rgba(59, 130, 246, 0.2);
+    
+    /* 載入步驟深色模式 */
+    --step-current-bg: rgba(59, 130, 246, 0.15);
+    --step-current-border: rgba(59, 130, 246, 0.4);
+    --step-completed-bg: rgba(16, 185, 129, 0.15);
+    
+    /* 取消按鈕深色模式 */
+    --cancel-btn-bg: rgba(239, 68, 68, 0.15);
+    --cancel-btn-border: rgba(239, 68, 68, 0.4);
+    --cancel-btn-color: #fca5a5;
+    --cancel-btn-hover-bg: rgba(239, 68, 68, 0.25);
+    --cancel-btn-hover-border: rgba(239, 68, 68, 0.6);
+    --cancel-btn-hover-color: #fecaca;
+    --cancel-btn-hover-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    --cancel-btn-active-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
+  }
+  
+  .loading-container {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .loading-title {
+    color: var(--text-primary);
+  }
+  
+  .loading-subtitle {
+    color: var(--text-secondary);
+  }
+  
+  .step-text {
+    color: var(--text-primary);
+  }
+  
+  .progress-hint {
+    color: var(--text-muted);
+  }
+  
+  .step-pending {
+    background: var(--text-muted);
+  }
+  
+  .charts-progress-text {
+    color: var(--brand-primary);
+  }
+  
+  .loading-icon {
+    color: var(--brand-primary);
+  }
 }
 
 /* Top Overview Section */
@@ -1810,6 +2439,330 @@ export default {
   50% { opacity: 0.5; }
 }
 
+/* wstETH Rewards Section */
+.wsteth-rewards-section {
+  margin-bottom: 32px;
+  padding: 0 24px;
+}
+
+.wsteth-rewards-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+  transition: all 0.3s ease;
+}
+
+.wsteth-rewards-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.wsteth-icon {
+  background: rgba(245, 158, 11, 0.1);
+  color: #F59E0B;
+}
+
+.refresh-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--brand-primary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.refresh-button:hover {
+  background: rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
+}
+
+/* wstETH 統計卡片 */
+.wsteth-stats-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin: 24px 0;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.stats-card {
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stats-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.stats-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stats-card:hover::before {
+  opacity: 0.6;
+}
+
+.stats-card.total-received {
+  color: var(--success);
+}
+
+.stats-card.transaction-count {
+  color: var(--brand-primary);
+}
+
+.stats-card.estimated-earnings {
+  color: var(--brand-secondary);
+  position: relative;
+}
+
+.stats-card .card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.05);
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.stats-card .card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stats-card .card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stats-card .card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.stats-card .card-value.negative {
+  color: var(--danger);
+}
+
+.stats-card .card-value.estimated {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.stats-card .card-value.error {
+  color: var(--danger);
+  font-style: italic;
+}
+
+.stats-card .card-unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.estimation-note {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* 交易記錄列表 */
+.wsteth-transactions {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.transactions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.transactions-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.transactions-count {
+  font-size: 14px;
+  color: var(--text-secondary);
+  background: rgba(245, 158, 11, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.transactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.transaction-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.transaction-item:hover {
+  background: rgba(245, 158, 11, 0.02);
+  border-color: rgba(245, 158, 11, 0.1);
+  transform: translateX(2px);
+}
+
+.tx-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tx-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tx-type.incoming {
+  color: var(--success);
+}
+
+.tx-type.outgoing {
+  color: #F59E0B;
+}
+
+.tx-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.tx-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.amount-value {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.tx-amount.incoming .amount-value {
+  color: var(--success);
+}
+
+.tx-amount.outgoing .amount-value {
+  color: #F59E0B;
+}
+
+.amount-unit {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.tx-hash {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 4px 8px;
+  border-radius: 4px;
+  min-width: 120px;
+  justify-content: flex-end;
+}
+
+.tx-hash:hover {
+  color: var(--brand-primary);
+  background: rgba(59, 130, 246, 0.1);
+  text-decoration: underline;
+}
+
+.show-more-transactions {
+  text-align: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.show-more-btn {
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.show-more-btn:hover {
+  background: var(--brand-primary);
+  color: white;
+}
+
 /* Historical Trends Section - 切換式圖表 */
 .historical-trends-section {
   margin-bottom: 32px;
@@ -2094,8 +3047,14 @@ export default {
   
   .split-wallet-section,
   .reward-share-section,
+  .wsteth-rewards-section,
   .historical-trends-section {
     padding: 0 20px;
+  }
+  
+  .wsteth-stats-cards {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
   }
   
   .operator-header-content {
@@ -2135,8 +3094,30 @@ export default {
   
   .split-wallet-section,
   .reward-share-section,
+  .wsteth-rewards-section,
   .historical-trends-section {
     padding: 0 16px;
+  }
+  
+  .wsteth-stats-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .transaction-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .tx-amount {
+    align-items: flex-start;
+    min-width: auto;
+  }
+  
+  .tx-hash {
+    min-width: auto;
+    justify-content: flex-start;
   }
   
   .split-wallet-section .address-header,
@@ -2195,9 +3176,34 @@ export default {
   .contract-address-section,
   .split-wallet-section,
   .reward-share-section,
+  .wsteth-rewards-section,
   .historical-trends-section {
     padding-left: 16px;
     padding-right: 16px;
+  }
+  
+  .stats-card {
+    padding: 16px;
+    gap: 12px;
+  }
+  
+  .stats-card .card-value {
+    font-size: 20px;
+  }
+  
+  .stats-card .card-icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .transaction-item {
+    padding: 12px;
+  }
+  
+  .transactions-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
   
   .split-wallet-section .address-description {
@@ -2275,6 +3281,28 @@ export default {
 
   .loading-step {
     padding: 6px;
+  }
+
+  .cancel-loading-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    margin-top: 16px;
+  }
+
+  .progress-hint {
+    font-size: 11px;
+  }
+}
+
+/* 深色模式 + 響應式 */
+@media (prefers-color-scheme: dark) and (max-width: 480px) {
+  .loading-container {
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+  
+  .cancel-loading-btn {
+    --cancel-btn-hover-shadow: 0 3px 10px rgba(239, 68, 68, 0.4);
   }
 }
 </style> 
