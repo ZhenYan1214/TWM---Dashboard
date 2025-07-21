@@ -1,73 +1,8 @@
 <template>
   <div class="operator-detail-dashboard">
     
-    <!-- 載入進度畫面 -->
-    <div v-if="isPageLoading" class="loading-overlay">
-      <div class="loading-container">
-        <div class="loading-header">
-          <div class="loading-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z"/>
-            </svg>
-          </div>
-          <h2 class="loading-title">載入操作者資料</h2>
-          <p class="loading-subtitle">正在準備 Operator #{{ operatorId }} 的詳細資訊</p>
-          
-          <!-- 取消按鈕 -->
-          <button @click="cancelLoading" class="cancel-loading-btn" title="取消載入並返回 Obol 列表">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-            返回列表
-          </button>
-        </div>
-
-        <!-- 進度條 -->
-        <div class="progress-section">
-          <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: loadingProgress + '%' }"></div>
-          </div>
-          <div class="progress-info">
-            <div class="progress-text">{{ Math.round(loadingProgress) }}%</div>
-            <div class="progress-hint">點擊下方「返回列表」可隨時返回 Obol 頁面</div>
-          </div>
-        </div>
-
-        <!-- 載入步驟 -->
-        <div class="loading-steps">
-          <div v-for="(step, index) in loadingSteps" 
-               :key="index" 
-               :class="['loading-step', { 
-                 'completed': step.completed, 
-                 'current': currentLoadingStep === step.name && !step.completed 
-               }]">
-            <div class="step-indicator">
-              <svg v-if="step.completed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 6L9 17L4 12"/>
-              </svg>
-              <div v-else-if="currentLoadingStep === step.name" class="step-loading">
-                <div class="loading-spinner"></div>
-              </div>
-              <div v-else class="step-pending"></div>
-            </div>
-            <div class="step-content">
-              <span class="step-text">{{ step.name }}</span>
-              <!-- 圖表初始化進度顯示 -->
-              <div v-if="step.name === '初始化所有圖表' && chartsInitializing" class="charts-progress">
-                <div class="charts-progress-bar">
-                  <div class="charts-progress-fill" :style="{ width: chartsProgress + '%' }"></div>
-                </div>
-                <span class="charts-progress-text">{{ Math.round(chartsProgress) }}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- 實際頁面內容 -->
-    <div v-else class="page-content">
+    <div class="page-content">
     <!-- Top Overview Section -->
     <section class="overview-section">
       <div class="operator-header-card">
@@ -605,19 +540,7 @@ export default {
         { value: '1m', label: '1個月' },
         { value: '1y', label: '1年' },
         { value: 'all', label: '全部' }
-      ],
-      // 頁面載入進度
-      isPageLoading: true,
-      loadingProgress: 0,
-      loadingCancelled: false, // 載入取消標誌
-      loadingSteps: [
-        { name: '初始化操作者資訊', completed: false },
-        { name: '載入 Split Wallet 地址', completed: false },
-        { name: '載入分潤配置資料', completed: false },
-        { name: '載入 wstETH 收益數據', completed: false },
-        { name: '初始化所有圖表', completed: false }
-      ],
-      currentLoadingStep: ''
+      ]
     }
   },
   computed: {
@@ -674,7 +597,8 @@ export default {
       immediate: true,
       handler(newData) {
         if (newData) {
-          this.startLoadingSequence(newData)
+          this.initializeData(newData)
+          this.startHotLoading()
         }
       }
     }
@@ -696,6 +620,26 @@ export default {
         console.warn('No operator data provided, using default values')
       }
     },
+
+    // 熱載入方法
+    async startHotLoading() {
+      console.log('🚀 開始熱載入操作者數據')
+      
+      // 並行載入所有數據
+      await Promise.all([
+        this.fetchSplitWalletData(),
+        this.loadLidoAPR()
+      ])
+      
+      // Split Wallet 載入完成後，並行載入相關數據
+      if (this.splitWalletAddress) {
+        await Promise.all([
+          this.fetchRewardShareData(this.splitWalletAddress),
+          this.fetchWstETHData(this.splitWalletAddress),
+          this.initializeAllCharts()
+        ])
+      }
+    },
     goBack() {
       // 發送事件到父組件返回儀表板
       this.$emit('go-back')
@@ -710,26 +654,54 @@ export default {
       event.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
     },
     
-    // Split Wallet 相關方法（用於手動刷新）
+    // Split Wallet 相關方法
     async fetchSplitWalletData() {
-      await this.fetchSplitWalletDataWithProgress()
-      
-      // 自動載入 Reward Share 資料
-      if (this.splitWalletAddress) {
-        this.fetchRewardShareData(this.splitWalletAddress)
+      if (!this.operatorInfo.rewardAddress) {
+        this.splitWalletError = '沒有獎勵地址，無法查詢 Split Wallet 資料'
+        return
+      }
+
+      this.splitWalletLoading = true
+      this.splitWalletError = null
+
+      try {
+        const address = await ether_obol.getObolOperatorSplitWallets(this.operatorInfo.rewardAddress)
+        this.splitWalletAddress = address
+      } catch (error) {
+        console.error('Error fetching split wallet address:', error)
+        this.splitWalletError = `載入失敗: ${error.message || '未知錯誤'}`
+      } finally {
+        this.splitWalletLoading = false
       }
     },
     
-    // Reward Share 相關方法（用於手動刷新）
+    // Reward Share 相關方法
     async fetchRewardShareData(splitWalletAddress) {
-      await this.fetchRewardShareDataWithProgress(splitWalletAddress)
+      this.rewardShareLoading = true
+      this.rewardShareError = null
+      
+      try {
+        const data = await ether_obol.getObolOperatorRewardshare(splitWalletAddress)
+        this.rewardShareData = data
+        
+        // 自動載入可領餘額
+        if (data && data.rewardAddress && data.rewardAddress.length > 0) {
+          await this.fetchClaimableRewards(data.rewardAddress)
+        }
+        
+      } catch (error) {
+        console.error('Error fetching reward share data:', error)
+        this.rewardShareError = `載入失敗: ${error.message || '未知錯誤'}`
+      } finally {
+        this.rewardShareLoading = false
+      }
     },
 
     // 手動重新載入分潤數據和可領餘額
     async refreshRewardShareData() {
       if (this.splitWalletAddress) {
         console.log('🔄 手動重新載入分潤數據和可領餘額')
-        await this.fetchRewardShareDataWithProgress(this.splitWalletAddress)
+        await this.fetchRewardShareData(this.splitWalletAddress)
       }
     },
     
@@ -761,276 +733,10 @@ export default {
       window.open(etherscanUrl, '_blank')
     },
 
-    // 載入進度相關方法
-    async startLoadingSequence(data) {
-      this.isPageLoading = true
-      this.loadingProgress = 0
-      this.loadingCancelled = false // 重置取消標誌
-      this.resetLoadingSteps()
 
-      try {
-        // 步驟 1: 初始化操作者資訊
-        await this.executeLoadingStep('初始化操作者資訊', async () => {
-          this.initializeData(data)
-          await this.delay(500) // 模擬載入時間
-        })
-
-        // 檢查是否已取消
-        if (this.loadingCancelled) return
-
-        // 步驟 2: 載入 Split Wallet 地址
-        await this.executeLoadingStep('載入 Split Wallet 地址', async () => {
-          await this.fetchSplitWalletDataWithProgress()
-        })
-
-        // 檢查是否已取消
-        if (this.loadingCancelled) return
-
-        // 步驟 3: 載入分潤配置資料
-        await this.executeLoadingStep('載入分潤配置資料', async () => {
-          if (this.splitWalletAddress) {
-            await this.fetchRewardShareDataWithProgress(this.splitWalletAddress)
-          } else {
-            await this.delay(300) // 如果沒有地址，短暫延遲
-          }
-        })
-
-        // 檢查是否已取消
-        if (this.loadingCancelled) return
-
-        // 步驟 4: 載入 wstETH 收益數據
-        await this.executeLoadingStep('載入 wstETH 收益數據', async () => {
-          if (this.splitWalletAddress) {
-            await this.fetchWstETHDataWithProgress(this.splitWalletAddress)
-          } else {
-            await this.delay(300) // 如果沒有地址，短暫延遲
-          }
-        })
-
-        // 檢查是否已取消
-        if (this.loadingCancelled) return
-
-        // 步驟 5: 初始化所有圖表
-        await this.executeLoadingStep('初始化所有圖表', async () => {
-          await this.initializeAllCharts()
-        })
-
-        // 檢查是否已取消
-        if (this.loadingCancelled) return
-
-        // 完成載入
-        this.loadingProgress = 100
-        await this.delay(500) // 顯示100%一會兒
-        
-        // 最後檢查是否已取消
-        if (!this.loadingCancelled) {
-          this.isPageLoading = false
-        }
-
-      } catch (error) {
-        console.error('載入序列失敗:', error)
-        
-        // 如果不是因為取消而失敗，顯示頁面
-        if (!this.loadingCancelled) {
-          this.isPageLoading = false
-        }
-      }
-    },
-
-    resetLoadingSteps() {
-      this.loadingSteps.forEach(step => {
-        step.completed = false
-      })
-      this.currentLoadingStep = ''
-    },
-
-    async executeLoadingStep(stepName, asyncFunction) {
-      // 檢查是否已取消載入
-      if (this.loadingCancelled) {
-        console.log('⏹️ 載入已取消，跳過步驟:', stepName, '- 用戶選擇返回 Obol 列表')
-        return
-      }
-      
-      this.currentLoadingStep = stepName
-      
-      try {
-        await asyncFunction()
-        
-        // 再次檢查是否已取消（異步操作完成後）
-        if (this.loadingCancelled) {
-          console.log('⏹️ 載入已取消，停止處理步驟結果:', stepName, '- 返回 Obol 列表')
-          return
-        }
-        
-        // 標記步驟完成
-        const step = this.loadingSteps.find(s => s.name === stepName)
-        if (step) {
-          step.completed = true
-        }
-        
-        // 更新進度
-        const completedSteps = this.loadingSteps.filter(s => s.completed).length
-        this.loadingProgress = (completedSteps / this.loadingSteps.length) * 100
-        
-        this.currentLoadingStep = ''
-        await this.delay(200) // 步驟間短暫停頓
-        
-      } catch (error) {
-        console.error(`執行載入步驟失敗: ${stepName}`, error)
-        
-        // 檢查是否為取消導致的錯誤
-        if (this.loadingCancelled) {
-          console.log('⏹️ 載入已取消，不處理錯誤:', stepName, '- 用戶返回 Obol 列表')
-          return
-        }
-        
-        // 即使失敗也標記為完成，繼續下一步
-        const step = this.loadingSteps.find(s => s.name === stepName)
-        if (step) {
-          step.completed = true
-        }
-        this.currentLoadingStep = ''
-      }
-    },
-
-    // 取消載入
-    cancelLoading() {
-      console.log('🚫 用戶取消載入操作，返回 Obol 列表')
-      
-      // 設置取消標誌
-      this.loadingCancelled = true
-      
-      // 立即隱藏載入畫面
-      this.isPageLoading = false
-      
-      // 重置載入狀態
-      this.resetLoadingState()
-      
-      // 發送事件返回 Obol 畫面
-      this.$emit('go-back')
-    },
-
-    // 重置載入狀態
-    resetLoadingState() {
-      this.loadingProgress = 0
-      this.currentLoadingStep = ''
-      this.loadingCancelled = false
-      this.resetLoadingSteps()
-      
-      // 重置所有載入狀態
-      this.splitWalletLoading = false
-      this.rewardShareLoading = false
-      this.claimableRewardsLoading = false
-      this.wstETHLoading = false
-      this.chartsInitializing = false
-      
-      // 清理圖表載入狀態
-      Object.keys(this.charts).forEach(period => {
-        this.charts[period].loading = false
-      })
-    },
-
-    delay(ms) {
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          if (this.loadingCancelled) {
-            reject(new Error('Loading cancelled'))
-          } else {
-            resolve()
-          }
-        }, ms)
-        
-        // 如果載入已經被取消，立即清理定時器
-        if (this.loadingCancelled) {
-          clearTimeout(timer)
-          reject(new Error('Loading cancelled'))
-        }
-      })
-    },
-
-    async fetchSplitWalletDataWithProgress() {
-      // 檢查是否已取消載入
-      if (this.loadingCancelled) {
-        console.log('⏹️ 載入已取消，跳過 Split Wallet 載入 - 返回 Obol 列表')
-        return
-      }
-
-      if (!this.operatorInfo.rewardAddress) {
-        this.splitWalletError = '沒有獎勵地址，無法查詢 Split Wallet 資料'
-        return
-      }
-
-      this.splitWalletLoading = true
-      this.splitWalletError = null
-
-      try {
-        const address = await ether_obol.getObolOperatorSplitWallets(this.operatorInfo.rewardAddress)
-        
-        // 檢查請求完成後是否已取消
-        if (this.loadingCancelled) {
-          console.log('⏹️ 載入已取消，忽略 Split Wallet 結果 - 返回 Obol 列表')
-          return
-        }
-        
-        this.splitWalletAddress = address
-      } catch (error) {
-        if (!this.loadingCancelled) {
-          console.error('Error fetching split wallet address:', error)
-          this.splitWalletError = `載入失敗: ${error.message || '未知錯誤'}`
-        }
-      } finally {
-        if (!this.loadingCancelled) {
-          this.splitWalletLoading = false
-        }
-      }
-    },
-    
-    async fetchRewardShareDataWithProgress(splitWalletAddress) {
-      // 檢查是否已取消載入
-      if (this.loadingCancelled) {
-        console.log('⏹️ 載入已取消，跳過分潤資料載入 - 返回 Obol 列表')
-        return
-      }
-
-      this.rewardShareLoading = true
-      this.rewardShareError = null
-      
-      try {
-        const data = await ether_obol.getObolOperatorRewardshare(splitWalletAddress)
-        
-        // 檢查請求完成後是否已取消
-        if (this.loadingCancelled) {
-          console.log('⏹️ 載入已取消，忽略分潤資料結果 - 返回 Obol 列表')
-          return
-        }
-        
-        this.rewardShareData = data
-        
-        // 自動載入可領餘額
-        if (data && data.rewardAddress && data.rewardAddress.length > 0) {
-          await this.fetchClaimableRewards(data.rewardAddress)
-        }
-        
-      } catch (error) {
-        if (!this.loadingCancelled) {
-          console.error('Error fetching reward share data:', error)
-          this.rewardShareError = `載入失敗: ${error.message || '未知錯誤'}`
-        }
-      } finally {
-        if (!this.loadingCancelled) {
-          this.rewardShareLoading = false
-        }
-      }
-    },
 
     // 載入可領餘額
     async fetchClaimableRewards(rewardAddresses) {
-      // 檢查是否已取消載入
-      if (this.loadingCancelled) {
-        console.log('⏹️ 載入已取消，跳過可領餘額載入 - 返回 Obol 列表')
-        return
-      }
-
       this.claimableRewardsLoading = true
       this.claimableRewardsError = null
       
@@ -1038,36 +744,19 @@ export default {
         console.log('🔍 開始載入可領餘額:', rewardAddresses)
         
         const claimableData = await ether_obol.getObolOperatorClaimableReward(rewardAddresses)
-        
-        // 檢查請求完成後是否已取消
-        if (this.loadingCancelled) {
-          console.log('⏹️ 載入已取消，忽略可領餘額結果 - 返回 Obol 列表')
-          return
-        }
-        
         this.claimableRewards = claimableData
         console.log('✅ 可領餘額載入成功:', claimableData)
         
       } catch (error) {
-        if (!this.loadingCancelled) {
-          console.error('❌ 載入可領餘額失敗:', error)
-          this.claimableRewardsError = `載入失敗: ${error.message || '未知錯誤'}`
-        }
+        console.error('❌ 載入可領餘額失敗:', error)
+        this.claimableRewardsError = `載入失敗: ${error.message || '未知錯誤'}`
       } finally {
-        if (!this.loadingCancelled) {
-          this.claimableRewardsLoading = false
-        }
+        this.claimableRewardsLoading = false
       }
     },
 
     // wstETH 數據載入方法
-    async fetchWstETHDataWithProgress(splitWalletAddress) {
-      // 檢查是否已取消載入
-      if (this.loadingCancelled) {
-        console.log('⏹️ 載入已取消，跳過 wstETH 數據載入 - 返回 Obol 列表')
-        return
-      }
-
+    async fetchWstETHData(splitWalletAddress) {
       this.wstETHLoading = true
       this.wstETHError = null
       this.predictionError = null
@@ -1084,12 +773,6 @@ export default {
           })
         ])
         
-        // 檢查請求完成後是否已取消
-        if (this.loadingCancelled) {
-          console.log('⏹️ 載入已取消，忽略 wstETH 數據結果 - 返回 Obol 列表')
-          return
-        }
-        
         this.wstETHSummary = summaryData
         this.wstETHTransactions = summaryData.transactions || []
         this.lidoAPR = lidoAPR
@@ -1098,24 +781,28 @@ export default {
         try {
           await this.calculateWstETHPrediction(summaryData.transactions || [])
         } catch (predictionError) {
-          if (!this.loadingCancelled) {
-            console.warn('收益預測計算失敗:', predictionError)
-            this.predictionError = predictionError.message
-          }
+          console.warn('收益預測計算失敗:', predictionError)
+          this.predictionError = predictionError.message
         }
         
-        if (!this.loadingCancelled) {
-          console.log('✅ wstETH 數據載入成功')
-        }
+        console.log('✅ wstETH 數據載入成功')
       } catch (error) {
-        if (!this.loadingCancelled) {
-          console.error('❌ wstETH 數據載入失敗:', error)
-          this.wstETHError = `載入失敗: ${error.message || '未知錯誤'}`
-        }
+        console.error('❌ wstETH 數據載入失敗:', error)
+        this.wstETHError = `載入失敗: ${error.message || '未知錯誤'}`
       } finally {
-        if (!this.loadingCancelled) {
-          this.wstETHLoading = false
-        }
+        this.wstETHLoading = false
+      }
+    },
+
+    // 載入 Lido APR
+    async loadLidoAPR() {
+      try {
+        console.log('🚀 開始載入 Lido Protocol APR')
+        const apr = await ether_obol.getLidoProtocolAPR()
+        this.lidoAPR = apr
+        console.log('✅ Lido APR 載入成功:', `${(apr * 100).toFixed(2)}%`)
+      } catch (error) {
+        console.error('❌ Lido APR 載入失敗:', error)
       }
     },
 
@@ -1180,7 +867,7 @@ export default {
     async refreshWstETHData() {
       if (this.splitWalletAddress) {
         console.log('🔄 手動重新載入 wstETH 數據和預測')
-        await this.fetchWstETHDataWithProgress(this.splitWalletAddress)
+        await this.fetchWstETHData(this.splitWalletAddress)
       }
     },
 
@@ -1260,10 +947,7 @@ export default {
       }
     },
     
-    async loadChartDataWithProgress() {
-      // 使用統一的載入邏輯
-      await this.loadChartData()
-    },
+
 
     // ========== 多圖表實例方法 ==========
     
@@ -1572,16 +1256,10 @@ export default {
   },
 
   beforeUnmount() {
-    console.log('🧹 OperatorDetail 組件即將卸載，清理所有資源並返回 Obol 列表')
-    
-    // 取消任何正在進行的載入
-    this.loadingCancelled = true
+    console.log('🧹 OperatorDetail 組件即將卸載，清理所有資源')
     
     // 清理圖表實例
     this.destroyAllCharts()
-    
-    // 重置載入狀態
-    this.resetLoadingState()
   }
 }
 </script>
@@ -1595,354 +1273,7 @@ export default {
   position: relative;
 }
 
-/* 載入進度畫面 */
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
 
-.loading-container {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
-  border-radius: 20px;
-  padding: 48px 40px;
-  box-shadow: var(--shadow-lg, 0 20px 40px rgba(0, 0, 0, 0.1));
-  max-width: 480px;
-  width: 90%;
-  text-align: center;
-}
-
-.loading-header {
-  margin-bottom: 32px;
-}
-
-.loading-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 20px;
-  color: var(--brand-primary);
-  animation: float 3s ease-in-out infinite;
-}
-
-.loading-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 8px 0;
-}
-
-.loading-subtitle {
-  font-size: 16px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-/* 進度條 */
-.progress-section {
-  margin-bottom: 32px;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 8px;
-  background: var(--progress-bg, rgba(59, 130, 246, 0.1));
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 12px;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--brand-primary), var(--brand-secondary));
-  border-radius: 4px;
-  transition: width 0.5s ease;
-  position: relative;
-}
-
-.progress-fill::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-  animation: shimmer 2s infinite;
-}
-
-.progress-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.progress-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--brand-primary);
-}
-
-.progress-hint {
-  font-size: 12px;
-  color: var(--text-muted);
-  opacity: 0.8;
-  font-weight: 400;
-}
-
-/* 載入步驟 */
-.loading-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.loading-step {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
-.loading-step.current {
-  background: var(--step-current-bg, rgba(59, 130, 246, 0.05));
-  border: 1px solid var(--step-current-border, rgba(59, 130, 246, 0.2));
-}
-
-.loading-step.completed {
-  background: var(--step-completed-bg, rgba(16, 185, 129, 0.05));
-}
-
-.step-indicator {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.step-indicator svg {
-  color: var(--success);
-}
-
-.step-loading {
-  width: 16px;
-  height: 16px;
-}
-
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(59, 130, 246, 0.3);
-  border-top: 2px solid var(--brand-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-.step-pending {
-  width: 8px;
-  height: 8px;
-  background: rgba(156, 163, 175, 0.3);
-  border-radius: 50%;
-}
-
-.step-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.step-text {
-  font-size: 14px;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.loading-step.current .step-text {
-  color: var(--brand-primary);
-  font-weight: 600;
-}
-
-.loading-step.completed .step-text {
-  color: var(--success);
-}
-
-/* 圖表初始化進度條樣式 */
-.charts-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.charts-progress-bar {
-  flex: 1;
-  height: 4px;
-  background: var(--progress-bg, rgba(59, 130, 246, 0.1));
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.charts-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--brand-primary), var(--brand-secondary));
-  border-radius: 2px;
-  transition: width 0.3s ease;
-  position: relative;
-}
-
-.charts-progress-fill::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-  animation: shimmer 1.5s infinite;
-}
-
-.charts-progress-text {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--brand-primary);
-  min-width: 32px;
-  text-align: right;
-}
-
-/* 動畫 */
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* 取消載入按鈕 */
-.cancel-loading-btn {
-  margin-top: 20px;
-  padding: 10px 20px;
-  background: var(--cancel-btn-bg, rgba(239, 68, 68, 0.1));
-  border: 1px solid var(--cancel-btn-border, rgba(239, 68, 68, 0.3));
-  color: var(--cancel-btn-color, #ef4444);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s ease;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.cancel-loading-btn:hover {
-  background: var(--cancel-btn-hover-bg, rgba(239, 68, 68, 0.2));
-  border-color: var(--cancel-btn-hover-border, rgba(239, 68, 68, 0.5));
-  color: var(--cancel-btn-hover-color, #dc2626);
-  transform: translateY(-1px);
-  box-shadow: var(--cancel-btn-hover-shadow, 0 4px 12px rgba(239, 68, 68, 0.2));
-}
-
-.cancel-loading-btn:active {
-  transform: translateY(0);
-  box-shadow: var(--cancel-btn-active-shadow, 0 2px 6px rgba(239, 68, 68, 0.15));
-}
-
-.cancel-loading-btn svg {
-  transition: transform 0.2s ease;
-}
-
-.cancel-loading-btn:hover svg {
-  transform: rotate(90deg);
-}
-
-/* 深色模式支援 */
-@media (prefers-color-scheme: dark) {
-  .loading-overlay {
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --bg-card: #1e293b;
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
-    --border-color: rgba(255, 255, 255, 0.1);
-    --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.4);
-    
-    /* 進度條深色模式 */
-    --progress-bg: rgba(59, 130, 246, 0.2);
-    
-    /* 載入步驟深色模式 */
-    --step-current-bg: rgba(59, 130, 246, 0.15);
-    --step-current-border: rgba(59, 130, 246, 0.4);
-    --step-completed-bg: rgba(16, 185, 129, 0.15);
-    
-    /* 取消按鈕深色模式 */
-    --cancel-btn-bg: rgba(239, 68, 68, 0.15);
-    --cancel-btn-border: rgba(239, 68, 68, 0.4);
-    --cancel-btn-color: #fca5a5;
-    --cancel-btn-hover-bg: rgba(239, 68, 68, 0.25);
-    --cancel-btn-hover-border: rgba(239, 68, 68, 0.6);
-    --cancel-btn-hover-color: #fecaca;
-    --cancel-btn-hover-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-    --cancel-btn-active-shadow: 0 2px 6px rgba(239, 68, 68, 0.25);
-  }
-  
-  .loading-container {
-    background: var(--bg-card);
-    border-color: var(--border-color);
-    box-shadow: var(--shadow-lg);
-  }
-  
-  .loading-title {
-    color: var(--text-primary);
-  }
-  
-  .loading-subtitle {
-    color: var(--text-secondary);
-  }
-  
-  .step-text {
-    color: var(--text-primary);
-  }
-  
-  .progress-hint {
-    color: var(--text-muted);
-  }
-  
-  .step-pending {
-    background: var(--text-muted);
-  }
-  
-  .charts-progress-text {
-    color: var(--brand-primary);
-  }
-  
-  .loading-icon {
-    color: var(--brand-primary);
-  }
-}
 
 /* Top Overview Section */
 .overview-section {
@@ -2649,6 +1980,11 @@ export default {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* wstETH Rewards Section */
@@ -3502,54 +2838,6 @@ export default {
     height: 250px;
     margin: 16px;
   }
-
-  /* 載入畫面響應式 */
-  .loading-container {
-    padding: 32px 24px;
-    max-width: 400px;
-  }
-
-  .loading-icon {
-    width: 48px;
-    height: 48px;
-  }
-
-  .loading-title {
-    font-size: 20px;
-  }
-
-  .loading-subtitle {
-    font-size: 14px;
-  }
-
-  .loading-steps {
-    gap: 8px;
-  }
-
-  .loading-step {
-    padding: 6px;
-  }
-
-  .cancel-loading-btn {
-    padding: 8px 16px;
-    font-size: 13px;
-    margin-top: 16px;
-  }
-
-  .progress-hint {
-    font-size: 11px;
-  }
 }
 
-/* 深色模式 + 響應式 */
-@media (prefers-color-scheme: dark) and (max-width: 480px) {
-  .loading-container {
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
-    border-color: rgba(255, 255, 255, 0.15);
-  }
-  
-  .cancel-loading-btn {
-    --cancel-btn-hover-shadow: 0 3px 10px rgba(239, 68, 68, 0.4);
-  }
-}
 </style> 
