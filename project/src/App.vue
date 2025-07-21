@@ -7,7 +7,7 @@
         <div class="dashboard-title-row">
           <div class="dashboard-title">
             <img src="./assets/TWM2.png" alt="Logo" class="dashboard-logo" />
-            {{ currentDashboard === 'flow' ? 'Flow Reward Dashboard' : 'Obol Reward Dashboard' }}
+            {{ currentDashboard === 'flow' ? 'Flow Reward Dashboard' : 'SimpleDVT Reward Dashboard' }}
           </div>
           <div class="dashboard-switcher">
             <button
@@ -17,7 +17,7 @@
             <button
               :class="['switch-btn', { active: currentDashboard === 'obol' }]"
               @click="switchToDashboard('obol')"
-            >Obol</button>
+            >SimpleDVT</button>
           </div>
         </div>
         <div class="theme-toggle" @click="toggleTheme" style="display: flex; align-items: center; gap: 10px;">

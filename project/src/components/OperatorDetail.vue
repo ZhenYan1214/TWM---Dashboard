@@ -78,7 +78,7 @@
           <div class="operator-info">
             <h2 class="operator-name">{{ operatorName }}</h2>
             <div class="operator-subtitle">
-              <span class="operator-id">操作者編號: #{{ operatorId }}</span>
+              <span class="operator-id">Operator ID: #{{ operatorId }}</span>
               <div class="status-badge" :class="operatorInfo.status">
                 <span class="status-dot"></span>
                 <span class="status-text">{{ operatorInfo.statusText }}</span>
@@ -104,10 +104,6 @@
               <path :d="card.iconPath"/>
             </svg>
           </div>
-          <div class="status-badge" :class="card.status">
-            <span class="status-text">{{ card.statusText }}</span>
-            <div class="status-indicator"></div>
-          </div>
         </div>
         
         <div class="card-content">
@@ -130,7 +126,7 @@
             </svg>
           </div>
           <div class="address-content">
-            <h3 class="address-title">合約地址</h3>
+            <h3 class="address-title">Address</h3>
             <p class="address-description contract-address" v-if="operatorInfo.rewardAddress" 
                @click="openEtherscan(operatorInfo.rewardAddress)" 
                title="點擊在 Etherscan 中查看">
@@ -165,7 +161,7 @@
             </svg>
           </div>
           <div class="address-content">
-            <h3 class="address-title">Split Wallet 地址</h3>
+            <h3 class="address-title">Split Wallet</h3>
             <p class="address-description" v-if="splitWalletLoading">正在載入中...</p>
             <p class="address-description" v-else-if="splitWalletError">載入失敗</p>
             <p class="address-description split-wallet-address" v-else-if="splitWalletAddress" 
@@ -213,11 +209,18 @@
             </p>
             <p class="section-description" v-else>等待 Split Wallet 地址載入</p>
           </div>
-          <div class="loading-indicator" v-if="rewardShareLoading">
+          <div class="refresh-button" @click="refreshRewardShareData" v-if="!rewardShareLoading && rewardShareData" title="重新載入分潤數據和可領餘額">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6M1 20v-6h6"/>
+              <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+            </svg>
+            重新載入
+          </div>
+          <div class="loading-indicator" v-if="rewardShareLoading || claimableRewardsLoading">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 2l-2 2m-7.61 2.61L18 12l-2.39 7.39L12 18l-7.39 2.39L6 18l-6-6 6-1.39L8.61 6.61"/>
             </svg>
-            載入中
+            {{ rewardShareLoading ? '載入分潤資料中' : '載入可領餘額中' }}
           </div>
         </div>
 
@@ -225,30 +228,58 @@
         <div v-if="rewardShareData && rewardShareData.rewardAddress" class="reward-share-list">
           <div class="list-header">
             <span class="header-title">獎勵地址分潤配置</span>
-            <span class="header-count">{{ rewardShareData.rewardAddress.length }} 個地址</span>
+            <div class="header-info">
+              <span class="header-count">{{ rewardShareData.rewardAddress.length }} 個地址</span>
+              <span v-if="claimableRewardsLoading" class="header-status loading">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 2l-2 2m-7.61 2.61L18 12l-2.39 7.39L12 18l-7.39 2.39L6 18l-6-6 6-1.39L8.61 6.61"/>
+                </svg>
+                載入餘額中...
+              </span>
+              <span v-else-if="claimableRewardsError" class="header-status error">
+                餘額載入失敗
+              </span>
+              <span v-else-if="claimableRewards" class="header-status success">
+                餘額已載入
+              </span>
+            </div>
           </div>
           
           <div class="share-items">
             <div v-for="(address, index) in rewardShareData.rewardAddress" 
                  :key="index" 
                  class="share-item">
-                             <div class="share-address-info">
-                 <div class="address-label">地址 {{ index + 1 }}</div>
-                 <div class="address-value" @click="openEtherscan(address)" title="點擊在 Etherscan 中查看">
-                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                     <polyline points="15,3 21,3 21,9"/>
-                     <line x1="10" y1="14" x2="21" y2="3"/>
-                   </svg>
-                   {{ address }}
-                 </div>
-               </div>
-              <div class="share-percentage">
-                <div class="percentage-label">分潤比例</div>
-                <div class="percentage-value">
-                  {{ calculateSharePercentage(rewardShareData.rewardShare[index]) }}
+              <div class="share-main-info">
+                <div class="share-address-info">
+                  <div class="address-label">地址 {{ index + 1 }}</div>
+                  <div class="address-value" @click="openEtherscan(address)" title="點擊在 Etherscan 中查看">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15,3 21,3 21,9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                    {{ address }}
+                  </div>
                 </div>
-                
+                <div class="share-percentage">
+                  <div class="percentage-label">分潤比例</div>
+                  <div class="percentage-value">
+                    {{ calculateSharePercentage(rewardShareData.rewardShare[index]) }}
+                  </div>
+                </div>
+                <!-- 可領餘額區域 - 放在分潤比例右邊 -->
+                <div class="claimable-reward-section">
+                  <div class="claimable-reward-label">可領餘額</div>
+                                  <div class="claimable-reward-value" :class="{ 
+                  'has-reward': hasClaimableReward(address),
+                  'no-reward': !hasClaimableReward(address) && !claimableRewardsLoading && !claimableRewardsError,
+                  'loading': claimableRewardsLoading,
+                  'error': claimableRewardsError
+                }">
+                  <div class="reward-amount">{{ formatClaimableReward(address) }}</div>
+                  <span v-if="!claimableRewardsLoading && !claimableRewardsError" class="reward-unit">wstETH</span>
+                </div>
+                </div>
               </div>
             </div>
           </div>
@@ -371,7 +402,7 @@
           </div>
           
           <div class="transactions-list">
-            <div v-for="(tx, index) in (showAllTransactions ? incomingTransactions : incomingTransactions.slice(0, 10))" 
+            <div v-for="(tx, index) in (showAllTransactions ? incomingTransactions : incomingTransactions.slice(0, 3))" 
                  :key="tx.hash" 
                  class="transaction-item">
               <div class="tx-info">
@@ -402,7 +433,7 @@
             </div>
           </div>
           
-          <div v-if="incomingTransactions.length > 10" class="show-more-transactions">
+          <div v-if="incomingTransactions.length > 3" class="show-more-transactions">
             <button class="show-more-btn" @click="showAllTransactions = !showAllTransactions">
               {{ showAllTransactions ? '收起' : `查看全部 ${incomingTransactions.length} 筆收入記錄` }}
             </button>
@@ -531,15 +562,12 @@ export default {
       // 從props初始化數據
       operatorId: '',
       operatorInfo: {
-        active: false,
         name: '',
         rewardAddress: '',
         totalVettedValidators: 0,
         totalExitedValidators: 0,
         totalAddedValidators: 0,
-        totalDepositedValidators: 0,
-        status: 'info',
-        statusText: '未知'
+        totalDepositedValidators: 0
       },
       // Split Wallet 相關數據
       splitWalletAddress: null,
@@ -549,6 +577,10 @@ export default {
       rewardShareData: null,
       rewardShareLoading: false,
       rewardShareError: null,
+      // 可領餘額相關數據
+      claimableRewards: null,
+      claimableRewardsLoading: false,
+      claimableRewardsError: null,
       // wstETH Token 相關數據
       wstETHSummary: null,
       wstETHTransactions: null,
@@ -614,29 +646,23 @@ export default {
     overviewCards() {
       return [
         {
-          label: '已退出驗證器',
+          label: 'Exited Validators',
           amount: this.operatorInfo.totalExitedValidators,
           unit: '個',
-          status: 'info',
-          statusText: '統計',
           iconClass: 'exited',
           iconPath: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9'
         },
         {
-          label: '總添加驗證器',
+          label: 'Total Validators',
           amount: this.operatorInfo.totalAddedValidators,
           unit: '個',
-          status: 'healthy',
-          statusText: '正常',
           iconClass: 'added',
           iconPath: 'M12 2L15.09 8.26L22 9L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9L8.91 8.26L12 2Z'
         },
         {
-          label: '已存入驗證器',
+          label: 'Active Validators',
           amount: this.operatorInfo.totalDepositedValidators,
           unit: '個',
-          status: 'healthy',
-          statusText: '正常',
           iconClass: 'deposited',
           iconPath: 'M20 6L9 17L4 12'
         }
@@ -659,15 +685,12 @@ export default {
       if (data && data.operatorData) {
         this.operatorId = data.operatorId || '0'
         this.operatorInfo = {
-          active: data.operatorData.active || false,
           name: data.operatorData.name || '',
           rewardAddress: data.operatorData.rewardAddress || '',
           totalVettedValidators: data.operatorData.totalVettedValidators || 0,
           totalExitedValidators: data.operatorData.totalExitedValidators || 0,
           totalAddedValidators: data.operatorData.totalAddedValidators || 0,
-          totalDepositedValidators: data.operatorData.totalDepositedValidators || 0,
-          status: data.operatorData.status || 'info',
-          statusText: data.operatorData.statusText || '未知'
+          totalDepositedValidators: data.operatorData.totalDepositedValidators || 0
         }
       } else {
         console.warn('No operator data provided, using default values')
@@ -700,6 +723,14 @@ export default {
     // Reward Share 相關方法（用於手動刷新）
     async fetchRewardShareData(splitWalletAddress) {
       await this.fetchRewardShareDataWithProgress(splitWalletAddress)
+    },
+
+    // 手動重新載入分潤數據和可領餘額
+    async refreshRewardShareData() {
+      if (this.splitWalletAddress) {
+        console.log('🔄 手動重新載入分潤數據和可領餘額')
+        await this.fetchRewardShareDataWithProgress(this.splitWalletAddress)
+      }
     },
     
     // 計算分潤百分比
@@ -889,6 +920,7 @@ export default {
       // 重置所有載入狀態
       this.splitWalletLoading = false
       this.rewardShareLoading = false
+      this.claimableRewardsLoading = false
       this.wstETHLoading = false
       this.chartsInitializing = false
       
@@ -973,6 +1005,12 @@ export default {
         }
         
         this.rewardShareData = data
+        
+        // 自動載入可領餘額
+        if (data && data.rewardAddress && data.rewardAddress.length > 0) {
+          await this.fetchClaimableRewards(data.rewardAddress)
+        }
+        
       } catch (error) {
         if (!this.loadingCancelled) {
           console.error('Error fetching reward share data:', error)
@@ -981,6 +1019,43 @@ export default {
       } finally {
         if (!this.loadingCancelled) {
           this.rewardShareLoading = false
+        }
+      }
+    },
+
+    // 載入可領餘額
+    async fetchClaimableRewards(rewardAddresses) {
+      // 檢查是否已取消載入
+      if (this.loadingCancelled) {
+        console.log('⏹️ 載入已取消，跳過可領餘額載入 - 返回 Obol 列表')
+        return
+      }
+
+      this.claimableRewardsLoading = true
+      this.claimableRewardsError = null
+      
+      try {
+        console.log('🔍 開始載入可領餘額:', rewardAddresses)
+        
+        const claimableData = await ether_obol.getObolOperatorClaimableReward(rewardAddresses)
+        
+        // 檢查請求完成後是否已取消
+        if (this.loadingCancelled) {
+          console.log('⏹️ 載入已取消，忽略可領餘額結果 - 返回 Obol 列表')
+          return
+        }
+        
+        this.claimableRewards = claimableData
+        console.log('✅ 可領餘額載入成功:', claimableData)
+        
+      } catch (error) {
+        if (!this.loadingCancelled) {
+          console.error('❌ 載入可領餘額失敗:', error)
+          this.claimableRewardsError = `載入失敗: ${error.message || '未知錯誤'}`
+        }
+      } finally {
+        if (!this.loadingCancelled) {
+          this.claimableRewardsLoading = false
         }
       }
     },
@@ -1112,7 +1187,7 @@ export default {
     // 格式化 wstETH 數量
     formatWstETHAmount(amount) {
       if (!amount || amount === 0) return '0'
-      if (amount < 0.001) return amount.toFixed(8)
+      if (amount < 0.001) return '<0.001'
       if (amount < 1) return amount.toFixed(6)
       return amount.toFixed(4)
     },
@@ -1133,6 +1208,44 @@ export default {
     // 獲取操作者類型
     getOperatorType() {
       return this.operatorType || 'Obol'
+    },
+
+    // 獲取特定地址的可領餘額
+    getClaimableReward(rewardAddress) {
+      if (!this.claimableRewards || !Array.isArray(this.claimableRewards)) {
+        return null
+      }
+      
+      const found = this.claimableRewards.find(item => 
+        item.rewardAddress && item.rewardAddress.toLowerCase() === rewardAddress.toLowerCase()
+      )
+      
+      return found ? found.claimableReward : null
+    },
+
+    // 格式化可領餘額
+    formatClaimableReward(rewardAddress) {
+      const claimableReward = this.getClaimableReward(rewardAddress)
+      
+      if (claimableReward === null || claimableReward === undefined) {
+        return this.claimableRewardsLoading ? '載入中...' : 
+               this.claimableRewardsError ? '載入失敗' : 'N/A'
+      }
+      
+      // 將 wei 轉換為 wstETH (18 位小數)
+      const wstETHAmount = parseFloat(claimableReward.toString()) / Math.pow(10, 18)
+      return this.formatWstETHAmount(wstETHAmount)
+    },
+
+    // 檢查是否有可領餘額
+    hasClaimableReward(rewardAddress) {
+      const claimableReward = this.getClaimableReward(rewardAddress)
+      if (claimableReward === null || claimableReward === undefined) {
+        return false
+      }
+      
+      const wstETHAmount = parseFloat(claimableReward.toString()) / Math.pow(10, 18)
+      return wstETHAmount > 0
     },
 
     // 計算收益率（預留邏輯）
@@ -1194,7 +1307,10 @@ export default {
         
         // 等待 DOM 更新後渲染圖表
         this.$nextTick(() => {
-          this.renderAllCharts()
+          // 額外延遲確保 Canvas 元素完全渲染
+          setTimeout(() => {
+            this.renderAllCharts()
+          }, 100)
         })
 
         console.log('🎉 所有圖表初始化完成')
@@ -1226,7 +1342,10 @@ export default {
         
         // 渲染圖表
         this.$nextTick(() => {
-          this.renderChart(period)
+          // 額外延遲確保 Canvas 元素完全渲染
+          setTimeout(() => {
+            this.renderChart(period)
+          }, 100)
         })
         
       } catch (error) {
@@ -1239,10 +1358,13 @@ export default {
     // 渲染所有圖表
     renderAllCharts() {
       console.log('🎯 開始渲染所有圖表')
-      this.availablePeriods.forEach(period => {
-        if (this.charts[period.value].data && !this.charts[period.value].loading) {
-          this.renderChart(period.value)
-        }
+      // 使用 nextTick 確保 DOM 已完全更新
+      this.$nextTick(() => {
+        this.availablePeriods.forEach(period => {
+          if (this.charts[period.value].data && !this.charts[period.value].loading) {
+            this.renderChart(period.value)
+          }
+        })
       })
     },
 
@@ -1262,40 +1384,58 @@ export default {
         return
       }
 
-      const canvas = this.$refs[`chartCanvas_${period}`]
-      if (!canvas || !canvas[0]) {
-        console.log(`⚠️ Canvas 不存在，延遲渲染: ${period}`)
-        setTimeout(() => this.renderChart(period), 100)
-        return
-      }
+      // 使用 nextTick 確保 DOM 已更新
+      this.$nextTick(() => {
+        const canvas = this.$refs[`chartCanvas_${period}`]
+        if (!canvas || !canvas[0]) {
+          console.log(`⚠️ Canvas 不存在，延遲渲染: ${period}`)
+          // 增加重試次數限制，避免無限循環
+          if (!this.charts[period].retryCount) {
+            this.charts[period].retryCount = 0
+          }
+          
+          if (this.charts[period].retryCount < 5) {
+            this.charts[period].retryCount++
+            setTimeout(() => this.renderChart(period), 200)
+          } else {
+            console.error(`❌ 圖表渲染失敗: ${period} - Canvas 無法找到`)
+            this.charts[period].error = 'Canvas 元素無法找到'
+            this.charts[period].retryCount = 0
+          }
+          return
+        }
 
-      try {
-        // 清理舊圖表
-        this.destroyChart(period)
+        try {
+          // 清理舊圖表
+          this.destroyChart(period)
 
-        // 確保 Canvas 可見
-        const canvasElement = canvas[0]
-        canvasElement.style.display = 'block'
-        canvasElement.style.width = '100%'
-        canvasElement.style.height = '100%'
+          // 確保 Canvas 可見
+          const canvasElement = canvas[0]
+          canvasElement.style.display = 'block'
+          canvasElement.style.width = '100%'
+          canvasElement.style.height = '100%'
 
-        // 準備數據
-        const { labels, datasets } = this.prepareChartData(chartData)
-        
-        // 創建新圖表
-        const ctx = canvasElement.getContext('2d')
-        this.charts[period].instance = new Chart(ctx, {
-          type: 'line',
-          data: { labels, datasets },
-          options: this.getChartOptions()
-        })
+          // 準備數據
+          const { labels, datasets } = this.prepareChartData(chartData)
+          
+          // 創建新圖表
+          const ctx = canvasElement.getContext('2d')
+          this.charts[period].instance = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets },
+            options: this.getChartOptions()
+          })
 
-        console.log(`🎉 圖表渲染成功: ${period}`)
+          console.log(`🎉 圖表渲染成功: ${period}`)
+          // 重置重試計數
+          this.charts[period].retryCount = 0
 
-      } catch (error) {
-        console.error(`❌ 圖表渲染失敗: ${period}`, error)
-        this.charts[period].error = `渲染失敗: ${error.message}`
-      }
+        } catch (error) {
+          console.error(`❌ 圖表渲染失敗: ${period}`, error)
+          this.charts[period].error = `渲染失敗: ${error.message}`
+          this.charts[period].retryCount = 0
+        }
+      })
     },
 
     // 數據準備方法
@@ -1317,7 +1457,7 @@ export default {
 
       const datasets = [
         {
-          label: '總添加驗證器',
+          label: 'Total Validators',
           data: totalAddedData,
           borderColor: '#3B82F6',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -1325,7 +1465,7 @@ export default {
           fill: false
         },
         {
-          label: '已啟動驗證器', 
+          label: 'Active Validators', 
           data: totalDepositedData,
           borderColor: '#10B981',
           backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -1333,7 +1473,7 @@ export default {
           fill: false
         },
         {
-          label: '已退出驗證器',
+          label: 'Exited Validators',
           data: totalExitedData,
           borderColor: '#9CA3AF',
           backgroundColor: 'rgba(156, 163, 175, 0.1)',
@@ -1418,7 +1558,10 @@ export default {
       this.destroyChart(period)
       if (this.charts[period].data) {
         this.$nextTick(() => {
-          this.renderChart(period)
+          // 額外延遲確保 Canvas 元素完全渲染
+          setTimeout(() => {
+            this.renderChart(period)
+          }, 100)
         })
       }
     }
@@ -1965,58 +2108,7 @@ export default {
   color: var(--brand-secondary);
 }
 
-.overview-card .status-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.overview-card .status-badge.healthy {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success);
-}
-
-.overview-card .status-badge.warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #F59E0B;
-}
-
-.overview-card .status-badge.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--danger);
-}
-
-.overview-card .status-badge.info {
-  background: rgba(99, 102, 241, 0.1);
-  color: var(--brand-secondary);
-}
-
-.status-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  animation: pulse 2s infinite;
-}
-
-.status-badge.healthy .status-indicator {
-  background: var(--success);
-}
-
-.status-badge.warning .status-indicator {
-  background: #F59E0B;
-}
-
-.status-badge.error .status-indicator {
-  background: var(--danger);
-}
-
-.status-badge.info .status-indicator {
-  background: var(--brand-secondary);
-}
+/* 移除狀態徽章相關樣式 */
 
 .overview-card .card-content {
   flex: 1;
@@ -2310,12 +2402,20 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  gap: 12px;
 }
 
 .header-title {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .header-count {
@@ -2326,6 +2426,35 @@ export default {
   border-radius: 4px;
 }
 
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.header-status.loading {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--brand-primary);
+}
+
+.header-status.loading svg {
+  animation: spin 1s linear infinite;
+}
+
+.header-status.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.header-status.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+}
+
 .share-items {
   display: flex;
   flex-direction: column;
@@ -2334,8 +2463,8 @@ export default {
 
 .share-item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
   padding: 16px;
   background: rgba(0, 0, 0, 0.02);
   border-radius: 8px;
@@ -2348,8 +2477,16 @@ export default {
   border-color: rgba(245, 158, 11, 0.2);
 }
 
+.share-main-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
 .share-address-info {
   flex: 1;
+  min-width: 0;
 }
 
 .address-label {
@@ -2381,8 +2518,9 @@ export default {
 }
 
 .share-percentage {
-  text-align: right;
+  text-align: center;
   min-width: 120px;
+  flex-shrink: 0;
 }
 
 .percentage-label {
@@ -2399,12 +2537,86 @@ export default {
   font-weight: 700;
   color: #F59E0B;
   margin-bottom: 2px;
+  text-align: center;
+  min-width: 80px;
 }
 
 .share-raw-value {
   font-size: 11px;
   color: var(--text-muted);
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+/* 可領餘額樣式 */
+.claimable-reward-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.claimable-reward-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.claimable-reward-value {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 120px;
+  margin-bottom: 2px;
+}
+
+.reward-amount {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  transition: color 0.3s ease;
+  line-height: 1;
+  text-align: right;
+  min-width: 80px;
+}
+
+.reward-unit {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  opacity: 0.8;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* 可領餘額狀態樣式 */
+.claimable-reward-value.has-reward .reward-amount {
+  color: var(--success);
+}
+
+.claimable-reward-value.no-reward .reward-amount {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.claimable-reward-value.loading .reward-amount {
+  color: var(--brand-primary);
+  font-style: italic;
+}
+
+.claimable-reward-value.error .reward-amount {
+  color: var(--danger);
+  font-style: italic;
+}
+
+/* 預設狀態 - 與分潤比例保持一致 */
+.claimable-reward-value .reward-amount {
+  color: #F59E0B;
 }
 
 .empty-state {
@@ -3128,6 +3340,10 @@ export default {
   }
   
   .share-item {
+    gap: 10px;
+  }
+  
+  .share-main-info {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
@@ -3136,6 +3352,24 @@ export default {
   .share-percentage {
     text-align: left;
     min-width: auto;
+  }
+  
+  .claimable-reward-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px;
+  }
+  
+  .claimable-reward-value {
+    align-items: flex-start;
+    min-width: auto;
+  }
+  
+  .header-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
   
   .operator-name {
@@ -3229,6 +3463,19 @@ export default {
   
   .share-address-info {
     margin-bottom: 8px;
+  }
+  
+  .claimable-reward-section {
+    padding: 8px;
+  }
+  
+  .reward-amount {
+    font-size: 14px;
+  }
+  
+  .header-status {
+    font-size: 11px;
+    padding: 2px 6px;
   }
 
   .chart-header {

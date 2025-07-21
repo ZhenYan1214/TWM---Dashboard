@@ -55,9 +55,23 @@
 
     <!-- Bottom Distribution Cards -->
     <section v-else class="distribution-section">
-      <div class="distribution-title">Obol Node Operators</div>
+      <div class="distribution-header">
+        <div class="distribution-title">Obol Node Operators</div>
+        <button @click="refreshData" class="refresh-button" title="重新載入 Obol 數據">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+          </svg>
+          重新載入
+        </button>
+      </div>
       <div class="distribution-grid">
-        <div v-for="(cluster, index) in clusterCards" :key="index" class="distribution-card" @click="goToOperatorDetail(cluster, index)" @mouseenter="addCardHover" @mouseleave="removeCardHover">
+        <div v-for="(cluster, index) in clusterCards" :key="index" 
+             class="distribution-card" 
+             :class="{ 'error-card': cluster.error }"
+             @click="cluster.error ? handleErrorCardClick() : goToOperatorDetail(cluster, index)" 
+             @mouseenter="cluster.error ? null : addCardHover" 
+             @mouseleave="cluster.error ? null : removeCardHover">
           <div class="card-header">
             <div class="card-title-section">
               <div class="operator-number">
@@ -81,55 +95,48 @@
             
             <div class="card-details">
               <div class="detail-row">
-                <div class="detail-label">總添加:</div>
+                <div class="detail-label">Total:</div>
                 <div class="validator-badge">
                   {{ cluster.totalAddedValidators }}
                 </div>
               </div>
               
               <div class="detail-row">
-                <div class="detail-label">已存入:</div>
+                <div class="detail-label">Active:</div>
                 <div class="deposited-badge">
                   {{ cluster.totalDepositedValidators }}
                 </div>
               </div>
               
               <div class="detail-row">
-                <div class="detail-label">獎勵地址:</div>
-                <div class="address-badge" @click.stop="copyToClipboard(cluster.rewardAddress)" :title="cluster.rewardAddress">
+                <div class="detail-label">Address:</div>
+                <div class="address-badge" 
+                     @click.stop="copyToClipboard(cluster.rewardAddress)" 
+                     :title="cluster.rewardAddress">
                   {{ formatAddress(cluster.rewardAddress) }}
                 </div>
               </div>
+            </div>
+          </div>
+          
+          <!-- 連線逾時遮罩 -->
+          <div v-if="cluster.error" class="connection-timeout-overlay">
+            <div class="timeout-content">
+              <div class="timeout-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 6v6l4 2"/>
+                </svg>
+              </div>
+              <div class="timeout-text">連線逾時</div>
+              <div class="timeout-subtext">無法載入操作者資料</div>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Summary Info Card -->
-    <div v-if="!isLoading && !error" class="summary-info-card">
-      <div class="summary-title">
-        <svg class="summary-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M12 8v4M12 16h.01"/>
-        </svg>
-        Obol Network 摘要
-      </div>
-      <div class="summary-content">
-        <div class="summary-row">
-          <span class="summary-label">總節點操作者：</span>
-          <span class="summary-value">{{ clusterCards.length }} 個</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-label">活躍驗證器總數：</span>
-          <span class="summary-value active">{{ totalActiveValidators }} 個</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-label">表現最佳操作者：</span>
-          <span class="summary-value">{{ mostActiveOperator }}</span>
-        </div>
-      </div>
-    </div>
+
   </div>
 </template>
 
@@ -156,23 +163,26 @@ export default {
   },
   computed: {
     overviewCards() {
-      const activeCount = this.clusterCards.filter(cluster => cluster.active).length
-      const totalValidators = this.clusterCards.reduce((sum, cluster) => sum + cluster.totalVettedValidators, 0)
+      const activeCount = this.clusterCards.filter(cluster => cluster.active && !cluster.error).length
+      const totalValidators = this.clusterCards.reduce((sum, cluster) => 
+        cluster.error ? sum : sum + cluster.totalVettedValidators, 0
+      )
+      const errorCount = this.clusterCards.filter(cluster => cluster.error).length
 
       return [
         {
           label: 'Clusters',
-          amount: activeCount,
+          amount: this.clusterCards.length,
           unit: '個',
-          status: activeCount > 0 ? 'healthy' : 'warning',
-          statusText: activeCount > 0 ? '運行中' : '待啟動'
+          status: errorCount === 0 ? (activeCount > 0 ? 'healthy' : 'warning') : 'error',
+          statusText: errorCount === 0 ? (activeCount > 0 ? '正常' : '載入中') : `${errorCount} 個連線逾時`
         },
         {
           label: 'Total Validators',
           amount: totalValidators,
           unit: '個',
           status: totalValidators > 0 ? 'healthy' : 'error',
-          statusText: totalValidators > 0 ? '活躍' : '無活動'
+          statusText: totalValidators > 0 ? '正常' : '載入中'
         },
         {
           label: 'Lido Protocol APR',
@@ -184,11 +194,16 @@ export default {
       ]
     },
     totalActiveValidators() {
-      return this.clusterCards.reduce((sum, cluster) => sum + cluster.totalVettedValidators, 0)
+      return this.clusterCards.reduce((sum, cluster) => 
+        cluster.error ? sum : sum + cluster.totalVettedValidators, 0
+      )
     },
     mostActiveOperator() {
       if (this.clusterCards.length === 0) return 'N/A'
-      const mostActive = this.clusterCards.reduce((max, cluster, index) => {
+      const validClusters = this.clusterCards.filter(cluster => !cluster.error)
+      if (validClusters.length === 0) return 'N/A'
+      
+      const mostActive = validClusters.reduce((max, cluster, index) => {
         return cluster.totalVettedValidators > (max.totalVettedValidators || 0) ? 
           { ...cluster, index } : max
       }, {})
@@ -320,11 +335,30 @@ export default {
       this.loadingProgress = '正在連接 Obol Network...'
       
       try {
-        this.loadingProgress = '正在拉取節點操作者資料...'
-        const nodeOperators = await ether_obol.getObolOperatorClustersRegistry()
+              this.loadingProgress = '正在拉取節點操作者資料...'
+      const result = await ether_obol.getObolOperatorClustersRegistry()
+      
+      this.loadingProgress = '正在處理資料...'
+      this.clusterCards = result.validOperators.map((operator, index) => {
+        // 檢查是否為錯誤結果
+        if (operator.error) {
+          return {
+            active: false,
+            name: `Operator #${operator.index}`,
+            rewardAddress: '連線逾時',
+            totalVettedValidators: 0,
+            totalExitedValidators: 0,
+            totalAddedValidators: 0,
+            totalDepositedValidators: 0,
+            status: 'error',
+            statusText: '連線逾時',
+            error: true,
+            errorMessage: operator.errorMessage
+          }
+        }
         
-        this.loadingProgress = '正在處理資料...'
-        this.clusterCards = nodeOperators.map((operator, index) => ({
+        // 正常數據處理
+        return {
           active: operator[0], // active
           name: operator[1] || `Operator #${index}`, // name
           rewardAddress: operator[2], // rewardAddress
@@ -333,8 +367,10 @@ export default {
           totalAddedValidators: parseInt(operator[5]) || 0, // totalAddedValidators
           totalDepositedValidators: parseInt(operator[6]) || 0, // totalDepositedValidators
           status: this.getClusterStatus(operator),
-          statusText: this.getClusterStatusText(operator)
-        }))
+          statusText: this.getClusterStatusText(operator),
+          error: false
+        }
+      })
         
         // 儲存到快取
         this.saveToCache()
@@ -396,6 +432,12 @@ export default {
       event.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)'
     },
     goToOperatorDetail(cluster, index) {
+      // 如果是錯誤狀態，不允許進入詳情頁
+      if (cluster.error) {
+        console.log('Cannot navigate to operator detail - connection timeout')
+        return
+      }
+      
       // 發送事件到父組件，傳遞操作者數據
       const operatorData = {
         operatorId: index,
@@ -404,6 +446,12 @@ export default {
       
       console.log('Navigating to operator detail:', operatorData)
       this.$emit('go-to-operator-detail', operatorData)
+    },
+
+    // 處理錯誤卡片的點擊
+    handleErrorCardClick() {
+      // 錯誤卡片不執行任何操作
+      console.log('Error card clicked - no action taken')
     }
   }
 }
@@ -633,12 +681,52 @@ export default {
   overflow: visible; /* 讓 body 控制整頁滾動 */
 }
 
+.distribution-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  margin-left: 8px;
+  margin-right: 8px;
+}
+
 .distribution-title {
   font-size: 20px;
   font-weight: 700;
   color: var(--brand-primary);
-  margin-bottom: 18px;
-  margin-left: 8px;
+}
+
+.refresh-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--brand-primary);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.refresh-button:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  transform: translateY(-1px);
+}
+
+.refresh-button:active {
+  transform: translateY(0);
+}
+
+.refresh-button svg {
+  transition: transform 0.3s ease;
+}
+
+.refresh-button:hover svg {
+  transform: rotate(180deg);
 }
 
 .distribution-grid {
@@ -661,6 +749,7 @@ export default {
   position: relative;
   min-height: 220px;
   cursor: pointer;
+  overflow: hidden;
 }
 
 .distribution-card:hover {
@@ -751,6 +840,8 @@ export default {
   color: var(--text-muted);
 }
 
+/* 移除舊的錯誤樣式，因為現在使用遮罩 */
+
 .card-details {
   display: flex;
   flex-direction: column;
@@ -781,6 +872,60 @@ export default {
   border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
+/* 連線逾時遮罩樣式 */
+.connection-timeout-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: var(--border-radius);
+}
+
+.timeout-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  color: white;
+}
+
+.timeout-icon {
+  color: var(--danger);
+  opacity: 0.9;
+}
+
+.timeout-text {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--danger);
+}
+
+.timeout-subtext {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  opacity: 0.9;
+}
+
+/* 錯誤狀態的卡片樣式 */
+.distribution-card.error-card {
+  cursor: not-allowed;
+}
+
+.distribution-card.error-card:hover {
+  transform: none;
+  box-shadow: 0 6px 24px rgba(59, 130, 246, 0.10), 0 1.5px 6px rgba(0,0,0,0.08);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
 .address-badge {
   cursor: pointer;
   transition: all 0.3s ease;
@@ -790,64 +935,7 @@ export default {
   background: rgba(99, 102, 241, 0.2);
 }
 
-/* Summary Info Card */
-.summary-info-card {
-  width: 100%;
-  max-width: 1180px;
-  margin: 36px auto 0 auto;
-  background: var(--bg-card);
-  border-radius: 18px;
-  box-shadow: 0 4px 24px rgba(59,130,246,0.10), 0 1.5px 6px rgba(0,0,0,0.08);
-  padding: 22px 24px 16px 24px;
-  display: flex;
-  flex-direction: column;
-  border: 1.5px solid rgba(0,0,0,0.10);
-}
 
-.summary-title {
-  display: flex;
-  align-items: center;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--brand-primary);
-  margin-bottom: 18px;
-}
-
-.summary-icon {
-  margin-right: 10px;
-  color: var(--brand-secondary);
-}
-
-.summary-content {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.summary-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.summary-label {
-  color: var(--text-muted);
-  min-width: 140px;
-}
-
-.summary-value {
-  color: var(--text-primary);
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.summary-value.active {
-  color: var(--success);
-}
 
 
 
@@ -899,6 +987,18 @@ export default {
     font-size: 32px;
   }
   
+  .distribution-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  .refresh-button {
+    align-self: flex-end;
+  }
+  
   .distribution-grid {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -906,9 +1006,7 @@ export default {
     padding-right: 0;
   }
   
-  .summary-info-card {
-    padding: 16px;
-  }
+
 }
 
 @media (max-width: 480px) {
