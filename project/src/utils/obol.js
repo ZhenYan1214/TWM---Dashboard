@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-
+import  { multicall, wrapCall } from "./multicall";
 // Operator Clusters Registry Contract
 const ObolOperatorClustersRegistry = "0xaE7B191A31f627b4eB1d4DaC64eaB9976995b433";
 // SplitMain Contract
@@ -51,32 +51,7 @@ const CHART_BATCH_DELAY = Number(import.meta.env.VITE_CHART_BATCH_DELAY) || 1000
 // 延遲函數
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// 分批處理請求
-const processBatches = async (items, batchProcessor) => {
-  const results = [];
-  
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    const batch = items.slice(i, i + BATCH_SIZE);
-    console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(items.length / BATCH_SIZE)}: ${batch.length} items`);
-    
-    try {
-      const batchResults = await batchProcessor(batch);
-      results.push(...batchResults);
-    } catch (error) {
-      console.error(`Batch ${Math.floor(i / BATCH_SIZE) + 1} failed:`, error);
-      // 添加空結果以保持索引一致
-      results.push(...new Array(batch.length).fill(null));
-    }
-    
-    // 如果不是最後一批，等待一段時間
-    if (i + BATCH_SIZE < items.length) {
-      console.log(`Waiting ${BATCH_DELAY}ms before next batch...`);
-      await delay(BATCH_DELAY);
-    }
-  }
-  
-  return results;
-};
+
 
 // 圖表數據專用的批次處理（更快的併發）
 const processChartBatches = async (items, batchProcessor) => {
@@ -124,27 +99,10 @@ export const ether_obol = {
       
       // 創建操作者索引數組
       const operatorIndices = Array.from({ length: operatorCount }, (_, i) => i);
-      
-      // 批次處理器函數
-      const batchProcessor = async (indices) => {
-        const promises = indices.map(index => 
-          obolOperatorClustersRegistryContract.getNodeOperator(index, true).catch(error => {
-            console.error(`Error fetching operator ${index}:`, error);
-            // 返回錯誤標記而不是 null，這樣可以保留索引位置
-            return { error: true, index, errorMessage: error.message };
-          })
-        );
-        
-        return Promise.all(promises);
-      };
-      
-      console.log(`Starting to fetch ${operatorCount} operators in batches of ${BATCH_SIZE}...`);
-      const nodeOperators = await processBatches(operatorIndices, batchProcessor);
-      
-      // 不過濾失敗的調用，保留所有結果包括錯誤
-      console.log(`Fetched ${nodeOperators.length}/${operatorCount} operators (including errors)`);
-      
-      return { activeNodeOperators, validOperators: nodeOperators };
+      const RegistryCalls = operatorIndices.map(index => wrapCall(ObolOperatorClustersRegistry, fullABI, "getNodeOperator", [index, true]));
+      const results = await multicall(RegistryCalls, provider);
+      console.log(results);
+      return { activeNodeOperators, validOperators: results };
     } catch (error) {
       console.error('Error in getObolOperatorClustersRegistry:', error);
       throw error;

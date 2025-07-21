@@ -157,7 +157,7 @@ export default {
       lidoAPRError: null,
       // 快取配置
       cacheKey: 'obol_clusters_data',
-      cacheExpiryTime: 5 * 60 * 1000, // 5分鐘快取過期時間
+      cacheExpiryTime: 60 * 60 * 1000, // 1小時快取過期時間
       lastFetchTime: null
     }
   },
