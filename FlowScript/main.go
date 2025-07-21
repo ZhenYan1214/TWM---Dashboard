@@ -141,7 +141,7 @@ func main() {
 	}
 
 	// 2. 讀取 rewards.json
-	data, err := ioutil.ReadFile("rewards.json")
+	data, err := os.ReadFile("rewards.json")
 	if err != nil {
 		fmt.Printf("讀取 rewards.json 失敗: %v\n", err)
 		os.Exit(1)

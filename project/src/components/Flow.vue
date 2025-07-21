@@ -272,6 +272,7 @@ export default {
     // 2. 動態產生所有 Delegator 卡片
     const delegatorTotals = [];
     const thisWeekDelegators = thisWeekData.filter(item => item.type === 'Delegator');
+    thisWeekDelegators.sort((a, b) => a.delegator_id - b.delegator_id);
     const lastWeekDelegators = lastWeekData.filter(item => item.type === 'Delegator');
     thisWeekDelegators.forEach(now => {
       const last = lastWeekDelegators.find(lw => lw.delegator_id === now.delegator_id);

@@ -347,7 +347,7 @@ func (d *Database) ClearRewards() error {
 	return err
 }
 
-// 根據日期範圍查詢獎勵記錄
+// 根據日期範圍查詢獎勵記錄，用來匯出CSV
 func (d *Database) GetRewardsByDateRange(start, end string) ([]RewardData, error) {
 	query := `
 	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total2, delegator_total3, delegator_total4, node_total
@@ -384,4 +384,3 @@ func (d *Database) GetRewardsByDateRange(start, end string) ([]RewardData, error
 	return rewards, nil
 }
 
-// main 函式已移除，因為 CLI.go 會使用這個檔案
