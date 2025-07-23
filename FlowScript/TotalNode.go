@@ -15,9 +15,9 @@ func main() {
 
 	payload := `{
 		"script": "aW1wb3J0IEZsb3dJRFRhYmxlU3Rha2luZyBmcm9tIDB4ODYyNGI1MmY5ZGRjZDA0YQ0KDQovLyBUaGlzIHNjcmlwdCBnZXRzIGFsbCB0aGUgaW5mbyBhYm91dCBhIG5vZGUgYW5kIHJldHVybnMgaXQNCmFjY2VzcyhhbGwpIGZ1biBtYWluKG5vZGVJRDogU3RyaW5nKTogRmxvd0lEVGFibGVTdGFraW5nLk5vZGVJbmZvIHsNCiAgICByZXR1cm4gRmxvd0lEVGFibGVTdGFraW5nLk5vZGVJbmZvKG5vZGVJRDogbm9kZUlEKQ0KfQ==",
-		"arguments": [
-			"eyJ0eXBlIjoiU3RyaW5nIiwidmFsdWUiOiJlOGY0YmQ2NDlkMDhlY2I1YWZiNzAyM2EwYzVlOGJiMTBjZTU2NjU5Mzk5NjY1ZGE4Y2M5ZDUxN2U3OTgyZjkyIn0="
-		]
+                "arguments": [
+                "eyJ0eXBlIjoiU3RyaW5nIiwidmFsdWUiOiJlOGY0YmQ2NDlkMDhlY2I1YWZiNzAyM2EwYzVlOGJiMTBjZTU2NjU5Mzk5NjY1ZGE4Y2M5ZDUxN2U3OTgyZjkyIn0="
+                ]
 	}`
 
 	body1 := strings.NewReader(payload)
