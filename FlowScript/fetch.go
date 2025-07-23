@@ -38,18 +38,17 @@ const MAX_GRPC_MESSAGE_SIZE = 1024 * 1024 * 16
 // An Identifier is a 32-byte unique identifier for an entity. From flow.go
 type Identifier [32]byte
 
-// 確保只保留這一份 RewardRecord struct 定義，其餘全部刪除
+// RewardRecord struct 改為每一筆只帶自己的 delegator_total
+// 其餘欄位維持原本格式
 type RewardRecord struct {
-	Type            string  `json:"type"`
-	NodeID          string  `json:"node_id"`
-	DelegatorID     int     `json:"delegator_id"`
-	Amount          float64 `json:"amount"`
-	EpochCounter    uint64  `json:"epoch_counter"`
-	Timestamp       string  `json:"timestamp"`
-	DelegatorTotal2 string  `json:"delegator_total2"`
-	DelegatorTotal3 string  `json:"delegator_total3"`
-	DelegatorTotal4 string  `json:"delegator_total4"`
-	Node_total      string  `json:"node_total"`
+	Type           string  `json:"type"`
+	NodeID         string  `json:"node_id"`
+	DelegatorID    int     `json:"delegator_id"`
+	Amount         float64 `json:"amount"`
+	EpochCounter   uint64  `json:"epoch_counter"`
+	Timestamp      string  `json:"timestamp"`
+	DelegatorTotal string  `json:"delegator_total"`
+	NodeTotal      string  `json:"node_total"`
 }
 
 // block height is the height of the block containing the rewards payout events
@@ -137,57 +136,114 @@ func main() {
 		fmt.Println("Find new end height =", blockEnd)
 	}
 
-	//看有沒有使用 -l ，一直找，直到找到reward事件
-	var allRecords []RewardRecord
+	// 1. 先收集所有 delegator id
+	type RawRecord struct {
+		Type         string
+		NodeID       string
+		DelegatorID  int
+		Amount       float64
+		EpochCounter uint64
+		Timestamp    string
+	}
+	var allRecordsRaw []RawRecord
+	delegatorIDSet := make(map[int]struct{})
 	blockStart := blockEnd - 249
 	if *lastReward {
 		bFound := false
 		for bFound == false {
-			records, err, found := GetBlockEvents(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, REWARD_PAID_EVENT)
+			records, err, found := GetBlockEventsCollectAll(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, REWARD_PAID_EVENT, delegatorIDSet)
 			if err != nil {
 				panic(err)
 			}
-			allRecords = append(allRecords, records...)
-			records, err, found2 := GetBlockEvents(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, DELEGATOR_REWARD_PAID_EVENT)
+			for _, r := range records {
+				allRecordsRaw = append(allRecordsRaw, r)
+			}
+			records, err, found2 := GetBlockEventsCollectAll(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, DELEGATOR_REWARD_PAID_EVENT, delegatorIDSet)
 			if err != nil {
 				panic(err)
 			}
-			allRecords = append(allRecords, records...)
+			for _, r := range records {
+				allRecordsRaw = append(allRecordsRaw, r)
+			}
 			bFound = found || found2
 			blockStart -= 250
 			blockEnd -= 250
 		}
-	} else { //沒有使用 -l 的話，就會把全部的reward event找完成
+	} else {
 		totalBlocks := *totalB
 		iterations := int(totalBlocks / 250)
 		var remaining uint64 = uint64(totalBlocks % 250)
 		for i := 0; i < iterations; i++ {
-			records, err, _ := GetBlockEvents(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, REWARD_PAID_EVENT)
+			records, err, _ := GetBlockEventsCollectAll(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, REWARD_PAID_EVENT, delegatorIDSet)
 			if err != nil {
 				panic(err)
 			}
-			allRecords = append(allRecords, records...)
-			records, err, _ = GetBlockEvents(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, DELEGATOR_REWARD_PAID_EVENT)
+			for _, r := range records {
+				allRecordsRaw = append(allRecordsRaw, r)
+			}
+			records, err, _ = GetBlockEventsCollectAll(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, DELEGATOR_REWARD_PAID_EVENT, delegatorIDSet)
 			if err != nil {
 				panic(err)
 			}
-			allRecords = append(allRecords, records...)
+			for _, r := range records {
+				allRecordsRaw = append(allRecordsRaw, r)
+			}
 			blockStart -= 250
 			blockEnd -= 250
 		}
 		if remaining != 0 {
 			blockStart += uint64(250) - remaining
-			records, err, _ := GetBlockEvents(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, REWARD_PAID_EVENT)
+			records, err, _ := GetBlockEventsCollectAll(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, REWARD_PAID_EVENT, delegatorIDSet)
 			if err != nil {
 				panic(err)
 			}
-			allRecords = append(allRecords, records...)
-			records, err, _ = GetBlockEvents(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, DELEGATOR_REWARD_PAID_EVENT)
+			for _, r := range records {
+				allRecordsRaw = append(allRecordsRaw, r)
+			}
+			records, err, _ = GetBlockEventsCollectAll(ctx, blockStart, blockEnd, accessNodeClient, *allFlag, DELEGATOR_REWARD_PAID_EVENT, delegatorIDSet)
 			if err != nil {
 				panic(err)
 			}
-			allRecords = append(allRecords, records...)
+			for _, r := range records {
+				allRecordsRaw = append(allRecordsRaw, r)
+			}
 		}
+	}
+	// 2. 查詢所有 delegator 的 tokensRewarded
+	delegatorTotals := make(map[string]string)
+	for id := range delegatorIDSet {
+		total, err := GetDelegatorTotal(id)
+		if err != nil {
+			fmt.Printf("查詢 delegator %d 總額失敗: %v\n", id, err)
+			delegatorTotals[strconv.Itoa(id)] = "0"
+		} else {
+			delegatorTotals[strconv.Itoa(id)] = total
+		}
+	}
+	nodeTotal, err := GetNodeTotal()
+	if err != nil {
+		fmt.Println("查詢 node_total 失敗:", err)
+		os.Exit(1)
+	}
+	// 3. 重新組裝 allRecords，帶上自己的 delegatorTotal
+	var allRecords []RewardRecord
+	for _, r := range allRecordsRaw {
+		idStr := strconv.Itoa(r.DelegatorID)
+		delegatorTotal := "0"
+		if v, ok := delegatorTotals[idStr]; ok {
+			delegatorTotal = v
+		}
+		rec := RewardRecord{
+			Type:           r.Type,
+			NodeID:         r.NodeID,
+			DelegatorID:    r.DelegatorID,
+			Amount:         r.Amount,
+			EpochCounter:   r.EpochCounter,
+			Timestamp:      r.Timestamp,
+			DelegatorTotal: delegatorTotal,
+			NodeTotal:      nodeTotal,
+		}
+		allRecords = append(allRecords, rec)
 	}
 	// print struct
 	fmt.Println("\n結果已經儲存成 struct，內容如下：")
@@ -218,48 +274,29 @@ func main() {
 	fmt.Println("***")
 }
 
-// get RewardPaid and DelegatedRewardPaid
-func GetBothRewardsBlockEvents(ctx context.Context, blockStart, blockEnd uint64, accessNodeClient *client.Client, all bool) ([]RewardRecord, error, bool) {
-	// REWARD_PAID
-	records1, err, bFound1 := GetBlockEvents(ctx, blockStart, blockEnd, accessNodeClient, all, REWARD_PAID_EVENT)
-	if err != nil {
-		return nil, err, false
-	}
-	// DELEGATOR_REWARD_PAID
-	records2, err, bFound2 := GetBlockEvents(ctx, blockStart, blockEnd, accessNodeClient, all, DELEGATOR_REWARD_PAID_EVENT)
-	if err != nil {
-		return nil, err, false
-	}
-
-	// 合併兩個結果
-	allRecords := append(records1, records2...)
-	return allRecords, err, bFound1 || bFound2
-}
-
-// 用...搜尋進度，顯示搜尋結果
-func GetBlockEvents(ctx context.Context, blockStart, blockEnd uint64, accessNodeClient *client.Client, all bool, eventString string) ([]RewardRecord, error, bool) {
-	//	fmt.Println("Start = ", blockStart, "End = ", blockEnd);
+// 新增：收集所有 delegator id 的版本，並回傳原始欄位
+func GetBlockEventsCollectAll(ctx context.Context, blockStart, blockEnd uint64, accessNodeClient *client.Client, all bool, eventString string, allDelegatorIDs map[int]struct{}) ([]struct {
+	Type         string
+	NodeID       string
+	DelegatorID  int
+	Amount       float64
+	EpochCounter uint64
+	Timestamp    string
+}, error, bool) {
 	fmt.Print(".")
-	// REWARD_PAID_ EVENT := "A.8624b52f9ddcd04a.FlowIDTableStaking.RewardsPaid"
-
-	blockEvents, err := accessNodeClient.GetEventsForHeightRange(ctx,
-		eventString,
-		blockStart, blockEnd)
-	/*
-		51753836,
-		51753836)
-	*/
+	blockEvents, err := accessNodeClient.GetEventsForHeightRange(ctx, eventString, blockStart, blockEnd)
 	bFound := false
-	var results []RewardRecord
-
+	var results []struct {
+		Type         string
+		NodeID       string
+		DelegatorID  int
+		Amount       float64
+		EpochCounter uint64
+		Timestamp    string
+	}
 	if err != nil {
 		panic(err)
-		/*	    fmt.Println("Encounter errors:", err, "Block start =", blockStart, " block end = ", blockEnd)
-			    return err, bFound
-		*/
 	}
-	// twm node ID: e8f4bd649d08ecb5afb7023a0c5e8bb10ce56659399665da8cc9d517e7982f92
-
 	for _, blockEvent := range blockEvents {
 		for _, event := range blockEvent.Events {
 			if all {
@@ -272,64 +309,37 @@ func GetBlockEvents(ctx context.Context, blockStart, blockEnd uint64, accessNode
 					fmt.Println("Failed to extract node ID and amount:", err)
 					return nil, err, bFound
 				}
-				// TWM_NODE_ID := "e8f4bd649d08ecb5afb7023a0c5e8bb10ce56659399665da8cc9d517e7982f92"
 				if nodeID == TWM_NODE_ID {
-					// 只保留 DelegatorID -1, 2, 3, 4
-					if !(delegatorID == -1 || delegatorID == 2 || delegatorID == 3 || delegatorID == 4) {
-						continue
-					}
-					// 獲取區塊時間戳
+					// 不再篩選 delegatorID，全部都收集
 					blockByID, err := accessNodeClient.GetBlockByID(ctx, blockEvent.BlockID)
 					if err != nil {
 						fmt.Println("err:", err.Error())
 						return nil, err, bFound
 					}
-
-					// 確定事件類型
 					eventType := "Node"
 					if strings.Contains(event.Type, "DelegatorRewardsPaid") {
 						eventType = "Delegator"
 					}
-
-					// 存成 struct
-					delegator2, delegator3, delegator4, err := GetDelegatorTotals()
-					if err != nil {
-						fmt.Println("查詢 delegator 總額失敗:", err)
-						os.Exit(1)
-					}
-					nodeTotal, err := GetNodeTotal()
-					if err != nil {
-						fmt.Println("查詢 node_total 失敗:", err)
-						os.Exit(1)
-					}
-					record := RewardRecord{
-						Type:            eventType,
-						NodeID:          nodeID,
-						DelegatorID:     delegatorID,
-						Amount:          amount,
-						EpochCounter:    epochCounter,
-						Timestamp:       blockByID.Timestamp.Format("2006-01-02 15:04:05"),
-						DelegatorTotal2: delegator2,
-						DelegatorTotal3: delegator3,
-						DelegatorTotal4: delegator4,
-						Node_total:      nodeTotal,
+					// 收集 delegatorID
+					allDelegatorIDs[delegatorID] = struct{}{}
+					record := struct {
+						Type         string
+						NodeID       string
+						DelegatorID  int
+						Amount       float64
+						EpochCounter uint64
+						Timestamp    string
+					}{
+						Type:         eventType,
+						NodeID:       nodeID,
+						DelegatorID:  delegatorID,
+						Amount:       amount,
+						EpochCounter: epochCounter,
+						Timestamp:    blockByID.Timestamp.Format("2006-01-02 15:04:05"),
 					}
 					results = append(results, record)
-					// 也 print 一下
-					fmt.Printf("Type=%s|NodeID=%s|DelegatorID=%d|Amount=%.8f|EpochCounter=%d|Timestamp=%s\n",
-						eventType,
-						nodeID,
-						delegatorID,
-						amount,
-						epochCounter,
-						record.Timestamp)
 					bFound = true
 				}
-				/*
-				   				} else {
-				       fmt.Print("X")
-				   }
-				*/
 			}
 		}
 	}
@@ -408,16 +418,6 @@ func JumpToNewEndHeight(ctx context.Context, accessNodeClient *client.Client, bl
 	return blockEndProbe, nil
 }
 
-func printBlock(block *flow.Block, err error) {
-	if err != nil {
-		fmt.Println("err:", err.Error())
-		panic(err)
-	}
-	fmt.Printf("\nID: %s\n", block.ID)
-	fmt.Printf("height: %d\n", block.Height)
-	fmt.Printf("timestamp: %s\n\n", block.Timestamp)
-}
-
 // extract node ID, delegatorID, amount, and epochCounter from the event
 func extractNodeIDAndAmount(eventString string) (string, int, float64, uint64, error) {
 	// Regular expression pattern to match node ID, delegatorID, amount, and epochCounter
@@ -457,71 +457,6 @@ func extractNodeIDAndAmount(eventString string) (string, int, float64, uint64, e
 	}
 
 	return nodeID, delegatorID, amount, epochCounter, nil
-}
-
-// 新增 function 查詢三個 delegator 的 tokensRewarded
-func GetDelegatorTotals() (string, string, string, error) {
-	url := "https://rest-mainnet.onflow.org/v1/scripts?blocks_height=final"
-	method := "POST"
-	ids := []int{2, 3, 4}
-	totals := make(map[int]string)
-
-	for _, delegatorID := range ids {
-		arg := fmt.Sprintf(`{"type":"UInt32","value":"%d"}`, delegatorID)
-		argBase64 := base64.StdEncoding.EncodeToString([]byte(arg))
-		payload := fmt.Sprintf(`{
-            "script": "aW1wb3J0IEZsb3dJRFRhYmxlU3Rha2luZyBmcm9tIDB4ODYyNGI1MmY5ZGRjZDA0YQ0KDQovLyBUaGlzIHNjcmlwdCByZXR1cm5zIGFsbCB0aGUgaW5mbyBhc3NvY2lhdGVkIHdpdGggYSBkZWxlZ2F0b3INCg0KYWNjZXNzKGFsbCkgZnVuIG1haW4obm9kZUlEOiBTdHJpbmcsIGRlbGVnYXRvcklEOiBVSW50MzIpOiBGbG93SURUYWJsZVN0YWtpbmcuRGVsZWdhdG9ySW5mbyB7DQogICAgcmV0dXJuIEZsb3dJRFRhYmxlU3Rha2luZy5EZWxlZ2F0b3JJbmZvKG5vZGVJRDogbm9kZUlELCBkZWxlZ2F0b3JJRDogZGVsZWdhdG9ySUQpDQp9DQo=",
-            "arguments": [
-                "eyJ0eXBlIjoiU3RyaW5nIiwidmFsdWUiOiJlOGY0YmQ2NDlkMDhlY2I1YWZiNzAyM2EwYzVlOGJiMTBjZTU2NjU5Mzk5NjY1ZGE4Y2M5ZDUxN2U3OTgyZjkyIn0=",
-                "%s"
-            ]
-        }`, argBase64)
-
-		body1 := strings.NewReader(payload)
-		req, err := http.NewRequest(method, url, body1)
-		if err != nil {
-			return "", "", "", err
-		}
-		req.Header.Set("Content-Type", "application/json")
-		client := &http.Client{}
-		res, err := client.Do(req)
-		if err != nil {
-			return "", "", "", err
-		}
-		defer res.Body.Close()
-
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			return "", "", "", err
-		}
-
-		cleaned := strings.Trim(string(body), "\"")
-		decoded, err := base64.StdEncoding.DecodeString(cleaned)
-		if err != nil {
-			return "", "", "", err
-		}
-
-		var outer struct {
-			Value struct {
-				Fields []struct {
-					Name  string `json:"name"`
-					Value struct {
-						Value string `json:"value"`
-					} `json:"value"`
-				} `json:"fields"`
-			} `json:"value"`
-		}
-		if err := json.Unmarshal(decoded, &outer); err != nil {
-			return "", "", "", err
-		}
-
-		for _, field := range outer.Value.Fields {
-			if field.Name == "tokensRewarded" {
-				totals[delegatorID] = field.Value.Value
-			}
-		}
-	}
-	return totals[2], totals[3], totals[4], nil
 }
 
 // 新增 function 查詢 node_total (tokensRewarded)
@@ -578,6 +513,121 @@ func GetNodeTotal() (string, error) {
 		}
 	}
 	return nodeTotal, nil
+}
+
+// 查詢單一 delegator 的 tokensRewarded
+// 查詢單一 delegator 的 tokensRewarded
+func GetDelegatorTotal(delegatorID int) (string, error) {
+	// 如果 delegatorID 是 -1，直接回傳 "0"，因為這代表 Node 本身而非 delegator
+	if delegatorID == -1 {
+		return "0", nil
+	}
+
+	url := "https://rest-mainnet.onflow.org/v1/scripts?blocks_height=final"
+	method := "POST"
+	arg := fmt.Sprintf(`{"type":"UInt32","value":"%d"}`, delegatorID)
+	argBase64 := base64.StdEncoding.EncodeToString([]byte(arg))
+	payload := fmt.Sprintf(`{
+        "script": "aW1wb3J0IEZsb3dJRFRhYmxlU3Rha2luZyBmcm9tIDB4ODYyNGI1MmY5ZGRjZDA0YQ0KDQovLyBUaGlzIHNjcmlwdCByZXR1cm5zIGFsbCB0aGUgaW5mbyBhc3NvY2lhdGVkIHdpdGggYSBkZWxlZ2F0b3INCg0KYWNjZXNzKGFsbCkgZnVuIG1haW4obm9kZUlEOiBTdHJpbmcsIGRlbGVnYXRvcklEOiBVSW50MzIpOiBGbG93SURUYWJsZVN0YWtpbmcuRGVsZWdhdG9ySW5mbyB7DQogICAgcmV0dXJuIEZsb3dJRFRhYmxlU3Rha2luZy5EZWxlZ2F0b3JJbmZvKG5vZGVJRDogbm9kZUlELCBkZWxlZ2F0b3JJRDogZGVsZWdhdG9ySUQpDQp9DQo=",
+        "arguments": [
+            "eyJ0eXBlIjoiU3RyaW5nIiwidmFsdWUiOiJlOGY0YmQ2NDlkMDhlY2I1YWZiNzAyM2EwYzVlOGJiMTBjZTU2NjU5Mzk5NjY1ZGE4Y2M5ZDUxN2U3OTgyZjkyIn0=",
+            "%s"
+        ]
+    }`, argBase64)
+
+	body1 := strings.NewReader(payload)
+	req, err := http.NewRequest(method, url, body1)
+	if err != nil {
+		return "", fmt.Errorf("建立 HTTP 請求失敗: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("HTTP 請求失敗: %w", err)
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("讀取回應失敗: %w", err)
+	}
+
+	// 先檢查 HTTP 狀態碼
+	if res.StatusCode != 200 {
+		return "", fmt.Errorf("API 回傳錯誤狀態碼 %d: %s", res.StatusCode, string(body))
+	}
+
+	// 檢查回應是否為空
+	if len(body) == 0 {
+		return "", fmt.Errorf("API 回傳空回應")
+	}
+
+	// 移除前後的引號
+	cleaned := strings.Trim(string(body), "\"")
+
+	// 檢查是否為有效的 base64
+	if len(cleaned) == 0 {
+		return "", fmt.Errorf("清理後的回應為空")
+	}
+
+	// 嘗試 base64 解碼，並提供更詳細的錯誤訊息
+	decoded, err := base64.StdEncoding.DecodeString(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("base64 解碼失敗 (原始回應: %s): %w", string(body), err)
+	}
+
+	// 解析 JSON 結構
+	var outer struct {
+		Value struct {
+			Fields []struct {
+				Name  string `json:"name"`
+				Value struct {
+					Value string `json:"value"`
+				} `json:"value"`
+			} `json:"fields"`
+		} `json:"value"`
+	}
+
+	if err := json.Unmarshal(decoded, &outer); err != nil {
+		return "", fmt.Errorf("JSON 解析失敗 (解碼後內容: %s): %w", string(decoded), err)
+	}
+
+	// 尋找 tokensRewarded 欄位
+	for _, field := range outer.Value.Fields {
+		if field.Name == "tokensRewarded" {
+			return field.Value.Value, nil
+		}
+	}
+
+	return "0", nil
+}
+
+// 同時也修正主函數中的 delegator 總額查詢部分
+func queryDelegatorTotalsFixed(delegatorIDSet map[int]struct{}) map[string]string {
+	delegatorTotals := make(map[string]string)
+
+	for id := range delegatorIDSet {
+		// 跳過 -1，因為它代表 Node 本身
+		if id == -1 {
+			delegatorTotals[strconv.Itoa(id)] = "0"
+			continue
+		}
+
+		total, err := GetDelegatorTotal(id)
+		if err != nil {
+			fmt.Printf("查詢 delegator %d 總額失敗: %v\n", id, err)
+			delegatorTotals[strconv.Itoa(id)] = "0"
+		} else {
+			delegatorTotals[strconv.Itoa(id)] = total
+		}
+
+		// 添加小延遲，避免 API 請求過於頻繁
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return delegatorTotals
 }
 
 /* sample reward paid message

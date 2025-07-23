@@ -1,8 +1,26 @@
 <template>
   <div class="flow-dashboard">
     <!-- Top Overview Cards -->
+    <div class="overview-title-block overview-title-flex">
+      <span class="overview-title-text">總 Reward 變動</span>
+      <div class="delegator-filter-popwrap" @click.stop>
+        <button class="delegator-filter-btn" @click="showOverviewFilter = !showOverviewFilter">FILTER</button>
+        <div v-if="showOverviewFilter" class="delegator-popover">
+          <div v-for="id in allDelegatorIdList" :key="id" class="delegator-pop-option"
+               @click.stop="toggleDelegator(id)">
+            <span class="delegator-pop-label">{{ id === -1 ? 'Node' : `Delegator${id}` }}</span>
+            <span v-if="selectedDelegators.includes(id)" class="delegator-pop-check">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="10" r="9" fill="#1ecb7b" fill-opacity="0.18"/>
+                <path d="M6 10.5L9 13.5L14 7.5" stroke="#1ecb7b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
     <section class="overview-section">
-      <div v-for="card in overviewCards" :key="card.label" class="overview-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
+      <div v-for="card in filteredDelegatorTotals" :key="card.label" class="overview-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
         <div class="card-header">
           <div class="card-icon">
             <svg width="52" height="52" viewBox="0 0 32 32" fill="none">
@@ -35,7 +53,7 @@
           </div>
         </div>
       </div>
-      <button v-if="overviewStartIndex + 3 < allDelegatorTotals.length" class="overview-next-btn" @click="nextOverview">下一個</button>
+      <!-- 輪播按鈕已移除，超過三個自動換行 -->
     </section>
 
     <!-- Divider -->
@@ -43,9 +61,11 @@
 
     <!-- Bottom Distribution Cards -->
     <section class="distribution-section">
-      <div class="distribution-title">本週 Reward 變動</div>
+      <div class="distribution-title-block overview-title-flex">
+        <span class="distribution-title-text">本週 Reward 變動</span>
+      </div>
       <div class="distribution-grid">
-        <div v-for="card in distributionCards.slice(distributionStartIndex, distributionStartIndex+4)" :key="card.id" class="distribution-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
+        <div v-for="card in filteredDistributionCards" :key="card.id" class="distribution-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
           <div class="card-header">
             <div class="card-title-section">
               <div class="card-icon">
@@ -105,7 +125,7 @@
             </div>
           </div>
         </div>
-        <button v-if="distributionStartIndex + 4 < distributionCards.length" class="distribution-next-btn" @click="nextDistribution">下一個</button>
+        <!-- 輪播按鈕已移除，超過四個自動換行 -->
       </div>
     </section>
     <!-- Divider between distribution and summary -->
@@ -114,7 +134,7 @@
     <div class="summary-info-card reward-log-card">
       <div class="summary-title">
         <svg class="summary-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-        詳細紀錄查詢
+        歷史紀錄查詢
       </div>
       <div class="log-toolbar">
         <select v-model="selectedWeek" class="log-week-select">
@@ -127,9 +147,9 @@
         <table class="reward-log-table">
           <thead>
             <tr>
-              <th @click="sortLog('timestamp')">時間 <span v-if="logSort==='timestamp'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
+              <th @click="sortLog('timestamp')">Timestamp <span v-if="logSort==='timestamp'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
               <th @click="sortLog('name')">ID <span v-if="logSort==='name'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
-              <th @click="sortLog('amount')">金額 <span v-if="logSort==='amount'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
+              <th @click="sortLog('amount')">Reward <span v-if="logSort==='amount'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
               <th @click="sortLog('epoch_counter')">Epoch <span v-if="logSort==='epoch_counter'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
             </tr>
           </thead>
@@ -158,22 +178,81 @@
 
 <script>
 import * as echarts from 'echarts';
-export default {
-  name: 'Flow',
+
+const MultiSelectButton = {
+  name: 'MultiSelectButton',
+  props: {
+    options: Array,
+    modelValue: Array,
+    labelFn: Function
+  },
+  emits: ['update:modelValue'],
   data() {
     return {
-      overviewCards: [], // 動態產生 Delegator 卡片
+      open: false,
+      localValue: [...(this.modelValue || [])]
+    }
+  },
+  watch: {
+    modelValue(val) {
+      this.localValue = [...val];
+    }
+  },
+  methods: {
+    toggle() { this.open = !this.open; },
+    close() { this.open = false; },
+    isChecked(opt) { return this.localValue.includes(opt); },
+    toggleOption(opt) {
+      if (this.isChecked(opt)) {
+        this.localValue = this.localValue.filter(v => v !== opt);
+      } else {
+        this.localValue = [...this.localValue, opt];
+      }
+      this.$emit('update:modelValue', this.localValue);
+    },
+    label(opt) { return this.labelFn ? this.labelFn(opt) : opt; },
+    handleClickOutside(e) {
+      if (!this.$el.contains(e.target)) this.open = false;
+    }
+  },
+  mounted() { document.addEventListener('click', this.handleClickOutside); },
+  beforeUnmount() { document.removeEventListener('click', this.handleClickOutside); },
+  template: `
+    <div class='msb-wrap'>
+      <button class='msb-btn' @click.stop='toggle' type='button'>
+        <span v-if='localValue.length === 0' class='msb-placeholder'>選擇 Delegator</span>
+        <span v-else class='msb-selected'>
+          <span v-for='(id, idx) in localValue' :key='id' class='msb-tag'>{{ label(id) }}</span>
+        </span>
+        <svg class='msb-arrow' width='16' height='16' viewBox='0 0 24 24'><path d='M7 10l5 5 5-5' stroke='currentColor' stroke-width='2' fill='none'/></svg>
+      </button>
+      <div v-if='open' class='msb-dropdown'>
+        <div v-for='opt in options' :key='opt' class='msb-option' @click.stop='toggleOption(opt)'>
+          <input type='checkbox' :checked='isChecked(opt)' readonly />
+          <span>{{ label(opt) }}</span>
+        </div>
+      </div>
+    </div>
+  `
+};
+
+export default {
+  name: 'Flow',
+  components: { MultiSelectButton },
+  data() {
+    return {
       allDelegatorTotals: [
         // { label: 'Delegator #2 總獎勵', amount: 0, change: 0, delegatorId: 2 }, ...
       ],
-      overviewStartIndex: 0,
+      selectedDelegators: [], // 多選篩選器
+      allDelegatorIdList: [], // 所有可選 delegatorId
       distributionCards: [ // 顯示本周新增內容
         {
           id: 'node',
           label: 'Node',
           amount: 0,
           change: 123.88,
-          delegatorId: 'NODE',
+          delegatorId: -1,
           epochCounter: 0,
         },
         {
@@ -201,7 +280,6 @@ export default {
           epochCounter: 0,
         }
       ],
-      distributionStartIndex: 0,
       summaryStats: {
         thisWeekTotal: 0,
         lastWeekTotal: 0,
@@ -217,6 +295,8 @@ export default {
       selectedWeek: '',
       weekOptions: [],
       logExpanded: false,
+      showOverviewFilter: false,
+      showDistributionFilter: false,
     }
   },
   computed: {
@@ -248,6 +328,14 @@ export default {
       });
       return arr;
     },
+    filteredDelegatorTotals() {
+      // 只顯示被選中的 delegator
+      return this.allDelegatorTotals.filter(card => this.selectedDelegators.includes(card.delegatorId));
+    },
+    filteredDistributionCards() {
+      // 只顯示被選中的 delegator
+      return this.distributionCards.filter(card => this.selectedDelegators.includes(card.delegatorId));
+    },
     displayedLog() {
       return this.logExpanded ? this.filteredLog : this.filteredLog.slice(0, 3);
     }
@@ -269,78 +357,65 @@ export default {
     const thisWeekData = thisWeekDate ? groupedByDate[thisWeekDate] : [];
     const lastWeekData = lastWeekDate ? groupedByDate[lastWeekDate] : [];
 
-    // 2. 動態產生所有 Delegator 卡片
+    // 2. 動態產生所有 Delegator 卡片（含 Node）
     const delegatorTotals = [];
     const thisWeekDelegators = thisWeekData.filter(item => item.type === 'Delegator');
     thisWeekDelegators.sort((a, b) => a.delegator_id - b.delegator_id);
     const lastWeekDelegators = lastWeekData.filter(item => item.type === 'Delegator');
+    const thisWeekNode = thisWeekData.find(item => item.type === 'Node');
+    const lastWeekNode = lastWeekData.find(item => item.type === 'Node');
+
+    if (thisWeekNode) {
+      delegatorTotals.push({
+        label: `Node 總獎勵`,
+        amount: thisWeekNode.node_total,
+        change: lastWeekNode ? (thisWeekNode.node_total - lastWeekNode.node_total) : 0,
+        delegatorId: -1
+      });
+    }
     thisWeekDelegators.forEach(now => {
       const last = lastWeekDelegators.find(lw => lw.delegator_id === now.delegator_id);
       delegatorTotals.push({
         label: `Delegator #${now.delegator_id} 總獎勵`,
-        amount: now[`delegator_total${now.delegator_id}`],
-        change: last ? (now[`delegator_total${now.delegator_id}`] - last[`delegator_total${now.delegator_id}`]) : 0,
+        amount: now.delegator_total,
+        change: last ? (now.delegator_total - last.delegator_total) : 0,
         delegatorId: now.delegator_id
       });
     });
     this.allDelegatorTotals = delegatorTotals;
-    this.overviewStartIndex = 0;
-    this.updateOverviewCards();
+    // 設定所有可選 delegatorId（含 Node）
+    this.allDelegatorIdList = delegatorTotals.map(card => card.delegatorId);
+    // 預設只選 Node、Delegator2、Delegator3
+    this.selectedDelegators = this.allDelegatorIdList.filter(id => id === -1 || id === 2 || id === 3);
 
-    // 3. 設定 Delegator 總額
-    const delegatorNow = thisWeekData.find(item => item.type === 'Delegator');
-    if (delegatorNow) {
-      this.overviewCards[0].amount = delegatorNow.delegator_total2;
-      this.overviewCards[1].amount = delegatorNow.delegator_total3;
-      this.overviewCards[2].amount = delegatorNow.delegator_total4;
+    // 3. 動態產生 distributionCards，支援所有 delegator（含 Node）
+    const distCards = [];
+    if (thisWeekNode) {
+      distCards.push({
+        id: 'node',
+        label: 'Node',
+        amount: thisWeekNode.amount,
+        change: lastWeekNode ? (thisWeekNode.amount - lastWeekNode.amount) : 0,
+        delegatorId: -1,
+        epochCounter: thisWeekNode.epoch_counter,
+      });
     }
-    // 4. 取得上週的 delegator_total2/3/4
-    let lastTotal2 = 0, lastTotal3 = 0, lastTotal4 = 0;
-    const delegatorLast = lastWeekData.find(item => item.type === 'Delegator');
-    if (delegatorLast) {
-      lastTotal2 = delegatorLast.delegator_total2;
-      lastTotal3 = delegatorLast.delegator_total3;
-      lastTotal4 = delegatorLast.delegator_total4;
-    }
-    // 5. 計算本週/上週 reward 總和
-    const thisWeekTotal = thisWeekData.reduce((sum, item) => sum + (item.amount || 0), 0);
-    const lastWeekTotal = lastWeekData.reduce((sum, item) => sum + (item.amount || 0), 0);
-    let growthRate = 0;
-    if (lastWeekTotal !== 0) {
-      growthRate = ((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100;
-    } else if (thisWeekTotal !== 0) {
-      growthRate = 100;
-    }
-    this.summaryStats = {
-      thisWeekTotal,
-      lastWeekTotal,
-      growthRate,
-    };
-    // 6. 設定 overviewCards 的 change
-    this.overviewCards[0].change = (delegatorNow && delegatorLast) ? (delegatorNow.delegator_total2 - lastTotal2) : 0;
-    this.overviewCards[1].change = (delegatorNow && delegatorLast) ? (delegatorNow.delegator_total3 - lastTotal3) : 0;
-    this.overviewCards[2].change = (delegatorNow && delegatorLast) ? (delegatorNow.delegator_total4 - lastTotal4) : 0;
-
-    // 7. 設定 distributionCards 的 amount、epochCounter、change
+    thisWeekDelegators.forEach(now => {
+      const last = lastWeekDelegators.find(lw => lw.delegator_id === now.delegator_id);
+      distCards.push({
+        id: `delegator${now.delegator_id}`,
+        label: `Delegator #${now.delegator_id}`,
+        amount: now.amount,
+        change: last ? (now.amount - last.amount) : 0,
+        delegatorId: now.delegator_id,
+        epochCounter: now.epoch_counter,
+      });
+    });
+    this.distributionCards = distCards;
+    // distributionCards 也要有 delegatorId 屬性（確保是數字）
     this.distributionCards.forEach(card => {
-      let now, last;
-      if (card.delegatorId === 'NODE') {
-        now = thisWeekData.find(item => item.type === 'Node');
-        last = lastWeekData.find(item => item.type === 'Node');
-      } else if (card.delegatorId === 'DEL-002') {
-        now = thisWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 2);
-        last = lastWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 2);
-      } else if (card.delegatorId === 'DEL-003') {
-        now = thisWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 3);
-        last = lastWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 3);
-      } else if (card.delegatorId === 'DEL-004') {
-        now = thisWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 4);
-        last = lastWeekData.find(item => item.type === 'Delegator' && item.delegator_id === 4);
-      }
-      if (now) {
-        card.amount = now.amount;
-        card.epochCounter = now.epoch_counter;
-        card.change = last ? (now.amount - last.amount) : 0;
+      if (typeof card.delegatorId === 'string' && card.delegatorId.startsWith('DEL-')) {
+        card.delegatorId = parseInt(card.delegatorId.replace('DEL-', ''));
       }
     });
 
@@ -464,18 +539,16 @@ export default {
       if (this.displayedLog.length === 2 && idx === 1) return { opacity: 0.7 };
       return {};
     },
-    updateOverviewCards() {
-      this.overviewCards = this.allDelegatorTotals.slice(this.overviewStartIndex, this.overviewStartIndex + 3);
+    // updateOverviewCards/nextOverview 已移除
+    // nextDistribution 已移除
+    handleGlobalClick() {
+      this.showOverviewFilter = false;
     },
-    nextOverview() {
-      if (this.overviewStartIndex + 3 < this.allDelegatorTotals.length) {
-        this.overviewStartIndex++;
-        this.updateOverviewCards();
-      }
-    },
-    nextDistribution() {
-      if (this.distributionStartIndex + 4 < this.distributionCards.length) {
-        this.distributionStartIndex++;
+    toggleDelegator(id) {
+      if (this.selectedDelegators.includes(id)) {
+        this.selectedDelegators = this.selectedDelegators.filter(v => v !== id);
+      } else {
+        this.selectedDelegators = [...this.selectedDelegators, id];
       }
     },
   }
@@ -484,14 +557,15 @@ export default {
 
 <style scoped>
 /* Overview Section */
+/* 改為 grid，每行三個卡片，自動換行 */
 .overview-section {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
   margin-bottom: 32px;
 }
 
 .overview-card {
-  flex: 1;
   background: var(--bg-card);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--border-radius);
@@ -609,6 +683,73 @@ export default {
   opacity: 1;
 }
 
+/* Overview Title 樣式，與 distribution-title 一致 */
+.overview-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--brand-primary);
+  margin-bottom: 18px;
+  margin-left: 4px;
+  letter-spacing: 1px;
+  line-height: 1.18;
+  text-shadow: 0 2px 8px rgba(126,182,255,0.08), 0 1px 2px rgba(179,170,255,0.06);
+  display: inline-block;
+  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.overview-title-block {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.overview-title-icon {
+  color: var(--brand-primary);
+}
+
+.overview-title-text {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--brand-primary);
+  margin-left: 4px;
+  letter-spacing: 1px;
+  line-height: 1.18;
+  text-shadow: 0 2px 8px rgba(126,182,255,0.08), 0 1px 2px rgba(179,170,255,0.06);
+  display: inline-block;
+  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.delegator-filter-wrap {
+  margin-left: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.delegator-multiselect {
+  min-width: 120px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--brand-primary);
+  background: var(--bg-card);
+  color: var(--brand-primary);
+  font-size: 15px;
+  font-weight: 700;
+  outline: none;
+  box-shadow: 0 1px 4px rgba(126,182,255,0.08);
+}
+
+.delegator-multiselect:focus {
+  border: 1.5px solid var(--brand-secondary);
+  box-shadow: 0 0 0 2px rgba(126,182,255,0.15);
+}
+
 /* Divider */
 .divider {
   width: 100%;
@@ -630,13 +771,48 @@ export default {
 }
 
 .distribution-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 800;
   color: var(--brand-primary);
   margin-bottom: 18px;
-  margin-left: 8px;
+  margin-left: 4px;
+  letter-spacing: 1px;
+  line-height: 1.18;
+  text-shadow: 0 2px 8px rgba(126,182,255,0.08), 0 1px 2px rgba(179,170,255,0.06);
+  display: inline-block;
+  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
+.distribution-title-block {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.distribution-title-icon {
+  color: var(--brand-primary);
+}
+
+.distribution-title-text {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--brand-primary);
+  margin-left: 4px;
+  letter-spacing: 1px;
+  line-height: 1.18;
+  text-shadow: 0 2px 8px rgba(126,182,255,0.08), 0 1px 2px rgba(179,170,255,0.06);
+  display: inline-block;
+  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 改為 grid，每行四個卡片，自動換行 */
 .distribution-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1274,5 +1450,145 @@ export default {
   background: linear-gradient(90deg, var(--brand-secondary) 0%, var(--brand-primary) 100%);
   box-shadow: 0 4px 16px rgba(126,182,255,0.18);
   transform: translateY(-2px) scale(1.04);
+}
+.msb-wrap {
+  position: relative;
+  display: inline-block;
+}
+.msb-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--brand-primary);
+  border-radius: 8px;
+  color: var(--brand-primary);
+  font-size: 15px;
+  font-weight: 700;
+  padding: 7px 18px 7px 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(126,182,255,0.08);
+  transition: border 0.18s, box-shadow 0.18s;
+  min-width: 120px;
+}
+.msb-btn:focus, .msb-btn:hover {
+  border: 1.5px solid var(--brand-secondary);
+  box-shadow: 0 0 0 2px rgba(126,182,255,0.15);
+}
+.msb-placeholder {
+  color: #b0b4ba;
+  font-weight: 500;
+}
+.msb-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.msb-tag {
+  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  color: #fff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-right: 2px;
+}
+.msb-arrow {
+  margin-left: 4px;
+  color: var(--brand-primary);
+  transition: transform 0.18s;
+}
+.msb-btn[aria-expanded="true"] .msb-arrow {
+  transform: rotate(180deg);
+}
+.msb-dropdown {
+  position: absolute;
+  top: 110%;
+  left: 0;
+  min-width: 160px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--brand-primary);
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(126,182,255,0.13);
+  z-index: 20;
+  padding: 8px 0;
+  margin-top: 4px;
+}
+.msb-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 18px 7px 14px;
+  font-size: 15px;
+  color: var(--brand-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.msb-option:hover {
+  background: rgba(126,182,255,0.08);
+}
+.msb-option input[type="checkbox"] {
+  accent-color: var(--brand-primary);
+  margin-right: 2px;
+}
+.delegator-filter-btn {
+  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 22px;
+  margin-left: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(126,182,255,0.10);
+  transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+}
+.delegator-filter-btn:hover {
+  background: linear-gradient(90deg, var(--brand-secondary) 0%, var(--brand-primary) 100%);
+  box-shadow: 0 4px 16px rgba(126,182,255,0.18);
+  transform: translateY(-2px) scale(1.04);
+}
+.delegator-filter-popwrap {
+  position: relative;
+  display: inline-block;
+}
+.delegator-popover {
+  position: absolute;
+  top: 110%;
+  left: 0;
+  min-width: 160px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--brand-primary);
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(126,182,255,0.13);
+  z-index: 20;
+  padding: 8px 0;
+  margin-top: 4px;
+}
+.delegator-pop-option {
+  padding: 7px 18px 7px 14px;
+  font-size: 15px;
+  color: var(--brand-primary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, font-weight 0.15s;
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+.delegator-pop-option.selected {
+  /* 不再高亮，只用勾勾 */
+}
+.delegator-pop-option:hover {
+  background: rgba(126,182,255,0.13);
+}
+.delegator-pop-check {
+  margin-left: 12px;
+  display: flex;
+  align-items: center;
+}
+.delegator-pop-label {
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 </style> 

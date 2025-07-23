@@ -5,7 +5,6 @@ go 1.24.4
 require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/mattn/go-sqlite3 v1.14.28
-	github.com/onflow/cadence v1.6.3
 	github.com/onflow/flow-go-sdk v1.6.2
 	google.golang.org/grpc v1.73.0
 )
@@ -42,6 +41,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/onflow/atree v0.10.0 // indirect
+	github.com/onflow/cadence v1.6.3 // indirect
 	github.com/onflow/crypto v0.25.3 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.4.11 // indirect
 	github.com/onflow/go-ethereum v1.15.10 // indirect

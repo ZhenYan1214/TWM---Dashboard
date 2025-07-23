@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -80,7 +81,7 @@ func main() {
 		c.JSON(http.StatusOK, rewards)
 	})
 
-	// 取得所有獎勵資料（依 timestamp DESC 排序）
+	// 取得所有獎勵資料（依 timestamp DESC 排序），支援 ids 參數
 	r.GET("/api/rewards/all", func(c *gin.Context) {
 		db, err := NewDatabase("data.db")
 		if err != nil {
@@ -89,15 +90,36 @@ func main() {
 		}
 		defer db.Close()
 
-		rewards, err := db.GetAllRewards()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "查詢失敗"})
-			return
+		idsParam := c.Query("ids")
+		var rewards []RewardData
+		if idsParam != "" {
+			idStrs := strings.Split(idsParam, ",")
+			ids := []int{}
+			for _, s := range idStrs {
+				if s == "" {
+					continue
+				}
+				id, err := strconv.Atoi(s)
+				if err == nil {
+					ids = append(ids, id)
+				}
+			}
+			rewards, err = db.GetRewardsByDelegators(ids)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "查詢失敗"})
+				return
+			}
+		} else {
+			rewards, err = db.GetAllRewards()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "查詢失敗"})
+				return
+			}
 		}
 		c.JSON(http.StatusOK, rewards)
 	})
 
-	// 匯出 CSV
+	// 匯出 CSV，支援 ids 參數
 	r.GET("/api/rewards/export", func(c *gin.Context) {
 		db, err := NewDatabase("data.db")
 		if err != nil {
@@ -107,12 +129,32 @@ func main() {
 		defer db.Close()
 
 		week := c.Query("week")
+		idsParam := c.Query("ids")
 		var rewards []RewardData
 		if week == "all" || week == "" {
-			rewards, err = db.GetAllRewards()
-			if err != nil {
-				c.String(http.StatusInternalServerError, "查詢失敗")
-				return
+			if idsParam != "" {
+				idStrs := strings.Split(idsParam, ",")
+				ids := []int{}
+				for _, s := range idStrs {
+					if s == "" {
+						continue
+					}
+					id, err := strconv.Atoi(s)
+					if err == nil {
+						ids = append(ids, id)
+					}
+				}
+				rewards, err = db.GetRewardsByDelegators(ids)
+				if err != nil {
+					c.String(http.StatusInternalServerError, "查詢失敗")
+					return
+				}
+			} else {
+				rewards, err = db.GetAllRewards()
+				if err != nil {
+					c.String(http.StatusInternalServerError, "查詢失敗")
+					return
+				}
 			}
 		} else {
 			parts := make([]string, 2)
@@ -121,26 +163,50 @@ func main() {
 				c.String(http.StatusBadRequest, "週期參數錯誤")
 				return
 			}
-			rewards, err = db.GetRewardsByDateRange(parts[0], parts[1])
-			if err != nil {
-				c.String(http.StatusInternalServerError, "查詢失敗")
-				return
+			if idsParam != "" {
+				idStrs := strings.Split(idsParam, ",")
+				ids := []int{}
+				for _, s := range idStrs {
+					if s == "" {
+						continue
+					}
+					id, err := strconv.Atoi(s)
+					if err == nil {
+						ids = append(ids, id)
+					}
+				}
+				rewards, err = db.GetRewardsByDelegators(ids)
+				if err != nil {
+					c.String(http.StatusInternalServerError, "查詢失敗")
+					return
+				}
+				// 篩選日期
+				filtered := []RewardData{}
+				for _, r := range rewards {
+					if r.Timestamp.Format("2006-01-02") >= parts[0] && r.Timestamp.Format("2006-01-02") <= parts[1] {
+						filtered = append(filtered, r)
+					}
+				}
+				rewards = filtered
+			} else {
+				rewards, err = db.GetRewardsByDateRange(parts[0], parts[1])
+				if err != nil {
+					c.String(http.StatusInternalServerError, "查詢失敗")
+					return
+				}
 			}
 		}
-
-		// 欄位順序: type,node_id,delegator_id,amount,epoch_counter,timestamp,delegator_total2,delegator_total3,delegator_total4,node_total
-		csv := "\uFEFFtype,node_id,delegator_id,amount,epoch_counter,timestamp,delegator_total2,delegator_total3,delegator_total4,node_total\n" // UTF-8 BOM
+		// 欄位順序: type,node_id,delegator_id,amount,epoch_counter,timestamp,delegator_total,node_total
+		csv := "\uFEFFtype,node_id,delegator_id,amount,epoch_counter,timestamp,delegator_total,node_total\n" // UTF-8 BOM
 		for _, row := range rewards {
 			csv += "\"" + row.Type + "\"," +
-				"\"" + row.NodeID + "\"," +
+				"\"TWM\"," +
 				"\"" + strconv.Itoa(row.DelegatorID) + "\"," +
 				formatAmount(row.Amount) + "," +
 				strconv.FormatUint(row.EpochCounter, 10) + "," +
 				"\"" + row.Timestamp.Format("2006-01-02 15:04:05") + "\"," +
-				formatAmount(row.Delegator_total2) + "," +
-				formatAmount(row.Delegator_total3) + "," +
-				formatAmount(row.Delegator_total4) + "," +
-				formatAmount(row.Node_total) + "\n"
+				formatAmount(row.DelegatorTotal) + "," +
+				formatAmount(row.NodeTotal) + "\n"
 		}
 		c.Header("Content-Type", "text/csv; charset=utf-8")
 		c.Header("Content-Disposition", "attachment; filename=reward_log.csv")
