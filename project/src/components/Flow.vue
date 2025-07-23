@@ -4,7 +4,12 @@
     <div class="overview-title-block overview-title-flex">
       <span class="overview-title-text">總 Reward 變動</span>
       <div class="delegator-filter-popwrap" @click.stop>
-        <button class="delegator-filter-btn" @click="showOverviewFilter = !showOverviewFilter">FILTER</button>
+        <button class="delegator-filter-btn-pro" @click="showOverviewFilter = !showOverviewFilter">
+          <svg class="filter-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
+            <path d="M3 5h14M6 9h8M9 13h2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          FILTER
+        </button>
         <div v-if="showOverviewFilter" class="delegator-popover">
           <div v-for="id in allDelegatorIdList" :key="id" class="delegator-pop-option"
                @click.stop="toggleDelegator(id)">
@@ -712,18 +717,21 @@ export default {
 }
 
 .overview-title-text {
-  font-size: 1.5rem;
-  font-weight: 800;
+  font-size: 1.8rem;
+  font-weight: 900;
   color: var(--brand-primary);
   margin-left: 4px;
-  letter-spacing: 1px;
-  line-height: 1.18;
-  text-shadow: 0 2px 8px rgba(126,182,255,0.08), 0 1px 2px rgba(179,170,255,0.06);
+  letter-spacing: 2px;
+  line-height: 1.13;
+  text-shadow: 0 4px 18px rgba(126,182,255,0.13), 0 1.5px 6px rgba(179,170,255,0.10);
   display: inline-block;
   background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  text-transform: uppercase;
+  font-stretch: expanded;
+  filter: brightness(1.08) drop-shadow(0 2px 8px rgba(126,182,255,0.10));
 }
 
 .delegator-filter-wrap {
@@ -798,18 +806,21 @@ export default {
 }
 
 .distribution-title-text {
-  font-size: 1.5rem;
-  font-weight: 800;
+  font-size: 1.8rem;
+  font-weight: 900;
   color: var(--brand-primary);
   margin-left: 4px;
-  letter-spacing: 1px;
-  line-height: 1.18;
-  text-shadow: 0 2px 8px rgba(126,182,255,0.08), 0 1px 2px rgba(179,170,255,0.06);
+  letter-spacing: 2px;
+  line-height: 1.13;
+  text-shadow: 0 4px 18px rgba(126,182,255,0.13), 0 1.5px 6px rgba(179,170,255,0.10);
   display: inline-block;
   background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  text-transform: uppercase;
+  font-stretch: expanded;
+  filter: brightness(1.08) drop-shadow(0 2px 8px rgba(126,182,255,0.10));
 }
 
 /* 改為 grid，每行四個卡片，自動換行 */
@@ -1125,9 +1136,19 @@ export default {
   display: flex;
   align-items: center;
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 900;
   color: var(--brand-primary);
   margin-bottom: 18px;
+  letter-spacing: 2px;
+  line-height: 1.13;
+  text-shadow: 0 4px 18px rgba(126,182,255,0.13), 0 1.5px 6px rgba(179,170,255,0.10);
+  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-transform: uppercase;
+  font-stretch: expanded;
+  filter: brightness(1.08) drop-shadow(0 2px 8px rgba(126,182,255,0.10));
 }
 .summary-icon {
   margin-right: 10px;
@@ -1590,5 +1611,36 @@ export default {
 .delegator-pop-label {
   font-weight: 700;
   letter-spacing: 0.5px;
+}
+.delegator-filter-btn-pro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  border: none;
+  border-radius: 14px;
+  padding: 7px 20px;
+  margin-left: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(126,182,255,0.13);
+  transition: background 0.18s, box-shadow 0.18s, transform 0.12s, filter 0.18s;
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+}
+.delegator-filter-btn-pro:hover {
+  background: linear-gradient(90deg, var(--brand-secondary) 0%, var(--brand-primary) 100%);
+  box-shadow: 0 6px 24px rgba(126,182,255,0.18);
+  transform: translateY(-2px) scale(1.045);
+  filter: brightness(1.08);
+}
+.filter-icon {
+  color: #fff;
+  opacity: 0.92;
+  margin-right: 2px;
 }
 </style> 
