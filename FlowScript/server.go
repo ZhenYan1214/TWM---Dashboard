@@ -196,8 +196,8 @@ func main() {
 				}
 			}
 		}
-		// 欄位順序: type,node_id,delegator_id,amount,epoch_counter,timestamp,delegator_total,node_total
-		csv := "\uFEFFtype,node_id,delegator_id,amount,epoch_counter,timestamp,delegator_total,node_total\n" // UTF-8 BOM
+		// 欄位順序: type,node_id,delegator_id,amount,epoch_counter,timestamp,delegator_total,node_total,node_staked,delegator_staked
+		csv := "\uFEFFtype,node_id,delegator_id,amount,epoch_counter,timestamp,delegator_total,node_total,node_staked,delegator_staked\n" // UTF-8 BOM
 		for _, row := range rewards {
 			csv += "\"" + row.Type + "\"," +
 				"\"TWM\"," +
@@ -206,7 +206,9 @@ func main() {
 				strconv.FormatUint(row.EpochCounter, 10) + "," +
 				"\"" + row.Timestamp.Format("2006-01-02 15:04:05") + "\"," +
 				formatAmount(row.DelegatorTotal) + "," +
-				formatAmount(row.NodeTotal) + "\n"
+				formatAmount(row.NodeTotal) + "," +
+				formatAmount(row.NodeStaked) + "," +
+				formatAmount(row.DelegatorStaked) + "\n"
 		}
 		c.Header("Content-Type", "text/csv; charset=utf-8")
 		c.Header("Content-Disposition", "attachment; filename=reward_log.csv")

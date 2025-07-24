@@ -61,10 +61,9 @@ func main() {
 		return
 	}
 
-	var id, tokensRewarded string
+	var id, tokensRewarded, value string
 	for _, field := range outer.Value.Fields {
 		if field.Name == "id" {
-			// 解析 value.value 為 string
 			var v struct {
 				Value string `json:"value"`
 			}
@@ -80,6 +79,14 @@ func main() {
 				tokensRewarded = v.Value
 			}
 		}
+		if field.Name == "tokensStaked" {
+			var v struct {
+				Value string `json:"value"`
+			}
+			if err := json.Unmarshal(field.Value, &v); err == nil {
+				value = v.Value
+			}
+		}
 	}
-	fmt.Printf("id: %s, tokensRewarded: %s\n", id, tokensRewarded)
+	fmt.Printf("id: %s, tokensRewarded: %s, value: %s\n", id, tokensRewarded, value)
 }

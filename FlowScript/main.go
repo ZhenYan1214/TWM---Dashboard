@@ -13,19 +13,17 @@ import (
 // RewardRecord struct 必須與 fetch.go 產生的 reward.json 欄位一致
 // 只要 main.go 能正確解析 reward.json 即可
 type RewardRecord struct {
-	Type           string  `json:"type"`
-	NodeID         string  `json:"node_id"`
-	DelegatorID    int     `json:"delegator_id"`
-	Amount         float64 `json:"amount"`
-	EpochCounter   uint64  `json:"epoch_counter"`
-	Timestamp      string  `json:"timestamp"`
-	DelegatorTotal string  `json:"delegator_total"`
-	NodeTotal      string  `json:"node_total"`
+	Type            string  `json:"type"`
+	NodeID          string  `json:"node_id"`
+	DelegatorID     int     `json:"delegator_id"`
+	Amount          float64 `json:"amount"`
+	EpochCounter    uint64  `json:"epoch_counter"`
+	Timestamp       string  `json:"timestamp"`
+	DelegatorTotal  string  `json:"delegator_total"`
+	NodeTotal       string  `json:"node_total"`
+	NodeStaked      string  `json:"node_staked"`
+	DelegatorStaked string  `json:"delegator_staked"`
 }
-
-// 移除 RewardData struct
-// 移除 Database struct
-// 移除 NewDatabase func
 
 func main() {
 	// 1. 執行 fetch.go
@@ -70,15 +68,21 @@ func main() {
 		fmt.Sscanf(r.DelegatorTotal, "%f", &delegatorTotal)
 		nodeTotal := 0.0
 		fmt.Sscanf(r.NodeTotal, "%f", &nodeTotal)
+		nodeStaked := 0.0
+		fmt.Sscanf(r.NodeStaked, "%f", &nodeStaked)
+		delegatorStaked := 0.0
+		fmt.Sscanf(r.DelegatorStaked, "%f", &delegatorStaked)
 		rewardDataList = append(rewardDataList, RewardData{
-			Type:           r.Type,
-			NodeID:         r.NodeID,
-			DelegatorID:    r.DelegatorID,
-			Amount:         r.Amount,
-			EpochCounter:   r.EpochCounter,
-			Timestamp:      t,
-			DelegatorTotal: delegatorTotal,
-			NodeTotal:      nodeTotal,
+			Type:            r.Type,
+			NodeID:          r.NodeID,
+			DelegatorID:     r.DelegatorID,
+			Amount:          r.Amount,
+			EpochCounter:    r.EpochCounter,
+			Timestamp:       t,
+			DelegatorTotal:  delegatorTotal,
+			NodeTotal:       nodeTotal,
+			NodeStaked:      nodeStaked,
+			DelegatorStaked: delegatorStaked,
 		})
 	}
 
