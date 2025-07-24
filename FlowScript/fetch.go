@@ -41,14 +41,16 @@ type Identifier [32]byte
 // RewardRecord struct 改為每一筆只帶自己的 delegator_total
 // 其餘欄位維持原本格式
 type RewardRecord struct {
-	Type           string  `json:"type"`
-	NodeID         string  `json:"node_id"`
-	DelegatorID    int     `json:"delegator_id"`
-	Amount         float64 `json:"amount"`
-	EpochCounter   uint64  `json:"epoch_counter"`
-	Timestamp      string  `json:"timestamp"`
-	DelegatorTotal string  `json:"delegator_total"`
-	NodeTotal      string  `json:"node_total"`
+	Type            string  `json:"type"`
+	NodeID          string  `json:"node_id"`
+	DelegatorID     int     `json:"delegator_id"`
+	Amount          float64 `json:"amount"`
+	EpochCounter    uint64  `json:"epoch_counter"`
+	Timestamp       string  `json:"timestamp"`
+	DelegatorTotal  string  `json:"delegator_total"`
+	NodeTotal       string  `json:"node_total"`
+	NodeStaked      string  `json:"node_staked"`
+	DelegatorStaked string  `json:"delegator_staked"`
 }
 
 // block height is the height of the block containing the rewards payout events
@@ -210,38 +212,35 @@ func main() {
 		}
 	}
 	// 2. 查詢所有 delegator 的 tokensRewarded
-	delegatorTotals := make(map[string]string)
-	for id := range delegatorIDSet {
-		total, err := GetDelegatorTotal(id)
-		if err != nil {
-			fmt.Printf("查詢 delegator %d 總額失敗: %v\n", id, err)
-			delegatorTotals[strconv.Itoa(id)] = "0"
-		} else {
-			delegatorTotals[strconv.Itoa(id)] = total
-		}
-	}
-	nodeTotal, err := GetNodeTotal()
+	// 查詢 nodeTotal, nodeStaked
+	nodeTotal, nodeStaked, err := GetNodeTotal()
 	if err != nil {
 		fmt.Println("查詢 node_total 失敗:", err)
 		os.Exit(1)
 	}
+	// 查詢所有 delegator 的 tokensRewarded 和 tokensStaked
+	delegatorTotals := queryDelegatorTotalsFixed(delegatorIDSet)
 	// 3. 重新組裝 allRecords，帶上自己的 delegatorTotal
 	var allRecords []RewardRecord
 	for _, r := range allRecordsRaw {
 		idStr := strconv.Itoa(r.DelegatorID)
 		delegatorTotal := "0"
+		delegatorStaked := "0"
 		if v, ok := delegatorTotals[idStr]; ok {
-			delegatorTotal = v
+			delegatorTotal = v.Rewarded
+			delegatorStaked = v.Staked
 		}
 		rec := RewardRecord{
-			Type:           r.Type,
-			NodeID:         r.NodeID,
-			DelegatorID:    r.DelegatorID,
-			Amount:         r.Amount,
-			EpochCounter:   r.EpochCounter,
-			Timestamp:      r.Timestamp,
-			DelegatorTotal: delegatorTotal,
-			NodeTotal:      nodeTotal,
+			Type:            r.Type,
+			NodeID:          r.NodeID,
+			DelegatorID:     r.DelegatorID,
+			Amount:          r.Amount,
+			EpochCounter:    r.EpochCounter,
+			Timestamp:       r.Timestamp,
+			DelegatorTotal:  delegatorTotal,
+			NodeTotal:       nodeTotal,
+			NodeStaked:      nodeStaked,
+			DelegatorStaked: delegatorStaked,
 		}
 		allRecords = append(allRecords, rec)
 	}
@@ -460,7 +459,7 @@ func extractNodeIDAndAmount(eventString string) (string, int, float64, uint64, e
 }
 
 // 新增 function 查詢 node_total (tokensRewarded)
-func GetNodeTotal() (string, error) {
+func GetNodeTotal() (string, string, error) {
 	url := "https://rest-mainnet.onflow.org/v1/scripts?blocks_height=final"
 	method := "POST"
 	payload := `{
@@ -472,23 +471,23 @@ func GetNodeTotal() (string, error) {
 	body1 := strings.NewReader(payload)
 	req, err := http.NewRequest(method, url, body1)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	cleaned := strings.Trim(string(body), "\"")
 	decoded, err := base64.StdEncoding.DecodeString(cleaned)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	var outer struct {
 		Value struct {
@@ -499,9 +498,9 @@ func GetNodeTotal() (string, error) {
 		} `json:"value"`
 	}
 	if err := json.Unmarshal(decoded, &outer); err != nil {
-		return "", err
+		return "", "", err
 	}
-	var nodeTotal string
+	var nodeTotal, nodeStaked string
 	for _, field := range outer.Value.Fields {
 		if field.Name == "tokensRewarded" {
 			var v struct {
@@ -511,16 +510,24 @@ func GetNodeTotal() (string, error) {
 				nodeTotal = v.Value
 			}
 		}
+		if field.Name == "tokensStaked" {
+			var v struct {
+				Value string `json:"value"`
+			}
+			if err := json.Unmarshal(field.Value, &v); err == nil {
+				nodeStaked = v.Value
+			}
+		}
 	}
-	return nodeTotal, nil
+	return nodeTotal, nodeStaked, nil
 }
 
 // 查詢單一 delegator 的 tokensRewarded
 // 查詢單一 delegator 的 tokensRewarded
-func GetDelegatorTotal(delegatorID int) (string, error) {
+func GetDelegatorTotal(delegatorID int) (string, string, error) {
 	// 如果 delegatorID 是 -1，直接回傳 "0"，因為這代表 Node 本身而非 delegator
 	if delegatorID == -1 {
-		return "0", nil
+		return "0", "0", nil
 	}
 
 	url := "https://rest-mainnet.onflow.org/v1/scripts?blocks_height=final"
@@ -538,30 +545,30 @@ func GetDelegatorTotal(delegatorID int) (string, error) {
 	body1 := strings.NewReader(payload)
 	req, err := http.NewRequest(method, url, body1)
 	if err != nil {
-		return "", fmt.Errorf("建立 HTTP 請求失敗: %w", err)
+		return "", "", fmt.Errorf("建立 HTTP 請求失敗: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("HTTP 請求失敗: %w", err)
+		return "", "", fmt.Errorf("HTTP 請求失敗: %w", err)
 	}
 	defer res.Body.Close()
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return "", fmt.Errorf("讀取回應失敗: %w", err)
+		return "", "", fmt.Errorf("讀取回應失敗: %w", err)
 	}
 
 	// 先檢查 HTTP 狀態碼
 	if res.StatusCode != 200 {
-		return "", fmt.Errorf("API 回傳錯誤狀態碼 %d: %s", res.StatusCode, string(body))
+		return "", "", fmt.Errorf("API 回傳錯誤狀態碼 %d: %s", res.StatusCode, string(body))
 	}
 
 	// 檢查回應是否為空
 	if len(body) == 0 {
-		return "", fmt.Errorf("API 回傳空回應")
+		return "", "", fmt.Errorf("API 回傳空回應")
 	}
 
 	// 移除前後的引號
@@ -569,13 +576,13 @@ func GetDelegatorTotal(delegatorID int) (string, error) {
 
 	// 檢查是否為有效的 base64
 	if len(cleaned) == 0 {
-		return "", fmt.Errorf("清理後的回應為空")
+		return "", "", fmt.Errorf("清理後的回應為空")
 	}
 
 	// 嘗試 base64 解碼，並提供更詳細的錯誤訊息
 	decoded, err := base64.StdEncoding.DecodeString(cleaned)
 	if err != nil {
-		return "", fmt.Errorf("base64 解碼失敗 (原始回應: %s): %w", string(body), err)
+		return "", "", fmt.Errorf("base64 解碼失敗 (原始回應: %s): %w", string(body), err)
 	}
 
 	// 解析 JSON 結構
@@ -591,38 +598,38 @@ func GetDelegatorTotal(delegatorID int) (string, error) {
 	}
 
 	if err := json.Unmarshal(decoded, &outer); err != nil {
-		return "", fmt.Errorf("JSON 解析失敗 (解碼後內容: %s): %w", string(decoded), err)
+		return "", "", fmt.Errorf("JSON 解析失敗 (解碼後內容: %s): %w", string(decoded), err)
 	}
 
 	// 尋找 tokensRewarded 欄位
+	var tokensRewarded, tokensStaked string
 	for _, field := range outer.Value.Fields {
 		if field.Name == "tokensRewarded" {
-			return field.Value.Value, nil
+			tokensRewarded = field.Value.Value
+		}
+		if field.Name == "tokensStaked" {
+			tokensStaked = field.Value.Value
 		}
 	}
-
-	return "0", nil
+	return tokensRewarded, tokensStaked, nil
 }
 
 // 同時也修正主函數中的 delegator 總額查詢部分
-func queryDelegatorTotalsFixed(delegatorIDSet map[int]struct{}) map[string]string {
-	delegatorTotals := make(map[string]string)
+func queryDelegatorTotalsFixed(delegatorIDSet map[int]struct{}) map[string]struct{ Rewarded, Staked string } {
+	delegatorTotals := make(map[string]struct{ Rewarded, Staked string })
 
 	for id := range delegatorIDSet {
-		// 跳過 -1，因為它代表 Node 本身
 		if id == -1 {
-			delegatorTotals[strconv.Itoa(id)] = "0"
+			delegatorTotals[strconv.Itoa(id)] = struct{ Rewarded, Staked string }{Rewarded: "0", Staked: "0"}
 			continue
 		}
-
-		total, err := GetDelegatorTotal(id)
+		rewarded, staked, err := GetDelegatorTotal(id)
 		if err != nil {
 			fmt.Printf("查詢 delegator %d 總額失敗: %v\n", id, err)
-			delegatorTotals[strconv.Itoa(id)] = "0"
+			delegatorTotals[strconv.Itoa(id)] = struct{ Rewarded, Staked string }{Rewarded: "0", Staked: "0"}
 		} else {
-			delegatorTotals[strconv.Itoa(id)] = total
+			delegatorTotals[strconv.Itoa(id)] = struct{ Rewarded, Staked string }{Rewarded: rewarded, Staked: staked}
 		}
-
 		// 添加小延遲，避免 API 請求過於頻繁
 		time.Sleep(100 * time.Millisecond)
 	}

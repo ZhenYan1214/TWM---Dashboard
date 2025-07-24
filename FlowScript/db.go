@@ -12,14 +12,16 @@ import (
 // RewardData 存儲獎勵資料的結構
 // 支援所有 delegator，只有一個 delegator_total
 type RewardData struct {
-	Type           string    `json:"type"`
-	NodeID         string    `json:"node_id"`
-	DelegatorID    int       `json:"delegator_id"`
-	Amount         float64   `json:"amount"`
-	EpochCounter   uint64    `json:"epoch_counter"`
-	Timestamp      time.Time `json:"timestamp"`
-	DelegatorTotal float64   `json:"delegator_total"`
-	NodeTotal      float64   `json:"node_total"`
+	Type            string    `json:"type"`
+	NodeID          string    `json:"node_id"`
+	DelegatorID     int       `json:"delegator_id"`
+	Amount          float64   `json:"amount"`
+	EpochCounter    uint64    `json:"epoch_counter"`
+	Timestamp       time.Time `json:"timestamp"`
+	DelegatorTotal  float64   `json:"delegator_total"`
+	NodeTotal       float64   `json:"node_total"`
+	NodeStaked      float64   `json:"node_staked"`
+	DelegatorStaked float64   `json:"delegator_staked"`
 }
 
 // Database 封裝數據庫操作
@@ -55,7 +57,9 @@ func (d *Database) createTable() error {
 		epoch_counter INTEGER NOT NULL,
 		timestamp DATETIME NOT NULL,
 		delegator_total REAL NOT NULL,
-		node_total REAL NOT NULL
+		node_total REAL NOT NULL,
+		node_staked REAL NOT NULL,
+		delegator_staked REAL NOT NULL
 	);
 	
 	CREATE INDEX IF NOT EXISTS idx_type ON rewards(type);
@@ -70,8 +74,8 @@ func (d *Database) createTable() error {
 // InsertReward 插入單一獎勵記錄
 func (d *Database) InsertReward(reward RewardData) error {
 	query := `
-	INSERT INTO rewards (type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO rewards (type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := d.db.Exec(query,
@@ -83,6 +87,8 @@ func (d *Database) InsertReward(reward RewardData) error {
 		reward.Timestamp,
 		reward.DelegatorTotal,
 		reward.NodeTotal,
+		reward.NodeStaked,
+		reward.DelegatorStaked,
 	)
 
 	if err != nil {
@@ -101,8 +107,8 @@ func (d *Database) InsertRewards(rewards []RewardData) error {
 	defer tx.Rollback()
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO rewards (type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO rewards (type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -119,6 +125,8 @@ func (d *Database) InsertRewards(rewards []RewardData) error {
 			reward.Timestamp,
 			reward.DelegatorTotal,
 			reward.NodeTotal,
+			reward.NodeStaked,
+			reward.DelegatorStaked,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert reward: %w", err)
@@ -131,7 +139,7 @@ func (d *Database) InsertRewards(rewards []RewardData) error {
 // GetAllRewards 取得所有獎勵記錄
 func (d *Database) GetAllRewards() ([]RewardData, error) {
 	query := `
-	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total
+	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked
 	FROM rewards
 	ORDER BY timestamp DESC
 	`
@@ -154,6 +162,8 @@ func (d *Database) GetAllRewards() ([]RewardData, error) {
 			&reward.Timestamp,
 			&reward.DelegatorTotal,
 			&reward.NodeTotal,
+			&reward.NodeStaked,
+			&reward.DelegatorStaked,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan reward: %w", err)
@@ -167,7 +177,7 @@ func (d *Database) GetAllRewards() ([]RewardData, error) {
 // GetRewardsByType 根據類型取得獎勵記錄
 func (d *Database) GetRewardsByType(rewardType string) ([]RewardData, error) {
 	query := `
-	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total
+	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked
 	FROM rewards
 	WHERE type = ?
 	ORDER BY timestamp DESC
@@ -191,6 +201,8 @@ func (d *Database) GetRewardsByType(rewardType string) ([]RewardData, error) {
 			&reward.Timestamp,
 			&reward.DelegatorTotal,
 			&reward.NodeTotal,
+			&reward.NodeStaked,
+			&reward.DelegatorStaked,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan reward: %w", err)
@@ -204,7 +216,7 @@ func (d *Database) GetRewardsByType(rewardType string) ([]RewardData, error) {
 // GetRewardsByDelegator 根據委託者 ID 取得獎勵記錄
 func (d *Database) GetRewardsByDelegator(delegatorID int) ([]RewardData, error) {
 	query := `
-	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total
+	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked
 	FROM rewards
 	WHERE delegator_id = ?
 	ORDER BY timestamp DESC
@@ -228,6 +240,8 @@ func (d *Database) GetRewardsByDelegator(delegatorID int) ([]RewardData, error) 
 			&reward.Timestamp,
 			&reward.DelegatorTotal,
 			&reward.NodeTotal,
+			&reward.NodeStaked,
+			&reward.DelegatorStaked,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan reward: %w", err)
@@ -290,7 +304,7 @@ func (d *Database) GetLatestBatchRewards() ([]RewardData, error) {
 
 	// 查詢該 timestamp 的所有資料
 	query := `
-        SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total
+        SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked
         FROM rewards
         WHERE timestamp = ?
         ORDER BY node_id
@@ -313,6 +327,8 @@ func (d *Database) GetLatestBatchRewards() ([]RewardData, error) {
 			&reward.Timestamp,
 			&reward.DelegatorTotal,
 			&reward.NodeTotal,
+			&reward.NodeStaked,
+			&reward.DelegatorStaked,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan reward: %w", err)
@@ -336,7 +352,7 @@ func (d *Database) ClearRewards() error {
 // 根據日期範圍查詢獎勵記錄，用來匯出CSV
 func (d *Database) GetRewardsByDateRange(start, end string) ([]RewardData, error) {
 	query := `
-	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total
+	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked
 	FROM rewards
 	WHERE timestamp >= ? AND timestamp <= ?
 	ORDER BY timestamp DESC
@@ -359,6 +375,8 @@ func (d *Database) GetRewardsByDateRange(start, end string) ([]RewardData, error
 			&reward.Timestamp,
 			&reward.DelegatorTotal,
 			&reward.NodeTotal,
+			&reward.NodeStaked,
+			&reward.DelegatorStaked,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan reward: %w", err)
@@ -373,7 +391,7 @@ func (d *Database) GetRewardsByDelegators(ids []int) ([]RewardData, error) {
 	if len(ids) == 0 {
 		return d.GetAllRewards()
 	}
-	query := `SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total FROM rewards WHERE delegator_id IN (`
+	query := `SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked FROM rewards WHERE delegator_id IN (`
 	params := make([]interface{}, len(ids))
 	for i, id := range ids {
 		params[i] = id
@@ -400,6 +418,8 @@ func (d *Database) GetRewardsByDelegators(ids []int) ([]RewardData, error) {
 			&reward.Timestamp,
 			&reward.DelegatorTotal,
 			&reward.NodeTotal,
+			&reward.NodeStaked,
+			&reward.DelegatorStaked,
 		)
 		if err != nil {
 			return nil, err

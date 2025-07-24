@@ -27,18 +27,21 @@
     <section class="overview-section">
       <div v-for="card in filteredDelegatorTotals" :key="card.label" class="overview-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
         <div class="card-header">
-          <div class="card-icon">
-            <svg width="52" height="52" viewBox="0 0 32 32" fill="none">
-              <defs>
-                <linearGradient id="user-blue" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stop-color="#7eb6ff"/>
-                  <stop offset="100%" stop-color="#b3aaff"/>
-                </linearGradient>
-              </defs>
-              <circle cx="16" cy="16" r="14" fill="url(#user-blue)" opacity="0.18"/>
-              <circle cx="16" cy="13" r="5" stroke="url(#user-blue)" stroke-width="2.2" fill="#fff"/>
-              <ellipse cx="16" cy="22.5" rx="7" ry="4.5" stroke="url(#user-blue)" stroke-width="2.2" fill="#fff"/>
-            </svg>
+          <div class="overview-title-section">
+            <div class="card-icon">
+              <svg width="52" height="52" viewBox="0 0 32 32" fill="none">
+                <defs>
+                  <linearGradient id="user-blue" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#7eb6ff"/>
+                    <stop offset="100%" stop-color="#b3aaff"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="16" cy="16" r="14" fill="url(#user-blue)" opacity="0.18"/>
+                <circle cx="16" cy="13" r="5" stroke="url(#user-blue)" stroke-width="2.2" fill="#fff"/>
+                <ellipse cx="16" cy="22.5" rx="7" ry="4.5" stroke="url(#user-blue)" stroke-width="2.2" fill="#fff"/>
+              </svg>
+            </div>
+            <span class="overview-card-title">{{ card.label }}</span>
           </div>
           <div class="change-badge" :class="{ 'positive': card.change > 0, 'negative': card.change < 0, 'neutral': card.change === 0 }">
             <span class="change-amount">{{ formatChange(card.change) }}</span>
@@ -52,9 +55,17 @@
         </div>
         
         <div class="card-content">
-          <div class="card-label">{{ card.label }}</div>
           <div class="main-amount">
             {{ formatAmount(card.amount) }} <span class="unit">FLOW</span>
+          </div>
+          <div class="overview-staked-divider"></div>
+          <div class="staked-row">
+            <svg class="staked-icon" width="16" height="16" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="9" stroke="#7eb6ff" stroke-width="2"/>
+              <path d="M7 10.5L10 13.5L15 8.5" stroke="#7eb6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="staked-label">Staked</span>
+            <span class="staked-amount">{{ formatAmount(card.staked) }}</span>
           </div>
         </div>
       </div>
@@ -375,7 +386,8 @@ export default {
         label: `Node 總獎勵`,
         amount: thisWeekNode.node_total,
         change: lastWeekNode ? (thisWeekNode.node_total - lastWeekNode.node_total) : 0,
-        delegatorId: -1
+        delegatorId: -1,
+        staked: thisWeekNode.node_staked
       });
     }
     thisWeekDelegators.forEach(now => {
@@ -384,7 +396,8 @@ export default {
         label: `Delegator #${now.delegator_id} 總獎勵`,
         amount: now.delegator_total,
         change: last ? (now.delegator_total - last.delegator_total) : 0,
-        delegatorId: now.delegator_id
+        delegatorId: now.delegator_id,
+        staked: now.delegator_staked
       });
     });
     this.allDelegatorTotals = delegatorTotals;
@@ -561,6 +574,32 @@ export default {
 </script>
 
 <style scoped>
+</style>
+
+<style>
+:root {
+  --change-badge-bg: rgba(16, 185, 129, 0.13);
+  --change-badge-color: #16a34a;
+  --change-badge-bg-neg: rgba(239, 68, 68, 0.13);
+  --change-badge-color-neg: #ef4444;
+  --change-badge-bg-neutral: #f3f4f6;
+}
+.dark {
+  --change-badge-bg: rgba(16, 185, 129, 0.1);
+  --change-badge-color: var(--success);
+  --change-badge-bg-neg: rgba(239, 68, 68, 0.1);
+  --change-badge-color-neg: var(--danger);
+  --change-badge-bg-neutral: #23263a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --change-badge-bg: rgba(16, 185, 129, 0.1);
+    --change-badge-color: var(--success);
+    --change-badge-bg-neg: rgba(239, 68, 68, 0.1);
+    --change-badge-color-neg: var(--danger);
+    --change-badge-bg-neutral: #23263a;
+  }
+}
 /* Overview Section */
 /* 改為 grid，每行三個卡片，自動換行 */
 .overview-section {
@@ -573,15 +612,15 @@ export default {
 .overview-card {
   background: var(--bg-card);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: var(--border-radius);
-  box-shadow: var(--shadow-sm);
-  padding: 28px 24px;
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(59,130,246,0.10), 0 1.5px 6px rgba(0,0,0,0.08), 0 0.5px 2px rgba(126,182,255,0.08);
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  min-height: 160px;
+  min-height: 90px;
 }
 
 .overview-card::before {
@@ -631,17 +670,17 @@ export default {
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success);
+  background: var(--change-badge-bg, rgba(16, 185, 129, 0.1));
+  color: var(--change-badge-color, var(--success));
 }
 
 .overview-card .change-badge.negative {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--danger);
+  background: var(--change-badge-bg-neg, rgba(239, 68, 68, 0.1));
+  color: var(--change-badge-color-neg, var(--danger));
 }
 
 .overview-card .change-badge.neutral {
-  background: #23263a;
+  background: var(--change-badge-bg-neutral, #f3f4f6);
   color: var(--brand-primary);
   font-style: normal;
   font-weight: 700;
@@ -654,7 +693,9 @@ export default {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
+  position: static;
+  padding-bottom: 0;
 }
 
 .overview-card .card-label {
@@ -668,6 +709,8 @@ export default {
 
 .overview-card .main-amount,
 .distribution-card .main-amount {
+  padding-left: 14px;
+  text-align: auto;
   font-size: 36px;
   font-weight: 950;
   color: var(--text-primary);
@@ -920,17 +963,17 @@ export default {
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success);
+  background: var(--change-badge-bg, rgba(16, 185, 129, 0.1));
+  color: var(--change-badge-color, var(--success));
 }
 
 .distribution-card .change-indicator.negative {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--danger);
+  background: var(--change-badge-bg-neg, rgba(239, 68, 68, 0.1));
+  color: var(--change-badge-color-neg, var(--danger));
 }
 
 .distribution-card .change-indicator.neutral {
-  background: #23263a;
+  background: var(--change-badge-bg-neutral, #f3f4f6);
   color: var(--brand-primary);
   font-style: normal;
   font-weight: 700;
@@ -1642,5 +1685,61 @@ export default {
   color: #fff;
   opacity: 0.92;
   margin-right: 2px;
+}
+.staked-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  color: rgba(59,130,246,0.55);
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  margin-bottom: 2px;
+  margin-top: 7px;
+  justify-content: flex-start;
+  animation: change-breath 1.8s infinite cubic-bezier(.4,2,.6,1);
+}
+.staked-icon {
+  vertical-align: middle;
+  margin-right: 2px;
+  opacity: 0.7;
+  margin-left: 10px;
+  
+}
+.staked-label {
+  font-weight: 600;
+  margin-right: 4px;
+  color: rgba(59,130,246,0.55);
+
+  letter-spacing: 0.5px;
+}
+.staked-amount {
+  font-weight: 700;
+  color: rgba(59,130,246,0.75);
+  font-size: 20px;
+  margin-left: 2px;
+}
+/* CSS: 新增 divider 與 staked-row 專業樣式 */
+.overview-staked-divider {
+  width: 100%;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(126,182,255,0.10) 0%, rgba(59,130,246,0.13) 50%, rgba(126,182,255,0.10) 100%);
+  border-radius: 2px;
+  margin: 18px 0 10px 0;
+}
+/* CSS: overview-title-section 與 overview-card-title */
+.overview-title-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 8px;
+  margin-top: 8px;
+}
+.overview-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  letter-spacing: 0.5px;
 }
 </style> 
