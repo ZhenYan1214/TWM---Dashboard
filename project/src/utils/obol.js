@@ -1,5 +1,6 @@
 import { ethers } from "ethers";
 import  { multicall, wrapCall } from "./multicall";
+import { MdArrowForward } from "@vicons/ionicons4";
 // Operator Clusters Registry Contract
 const ObolOperatorClustersRegistry = "0xaE7B191A31f627b4eB1d4DaC64eaB9976995b433";
 // SplitMain Contract
@@ -9,7 +10,7 @@ const WSTETH_CONTRACT = '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0';
 
 // Obol Operator Clusters Registry Contract ABI
 const ObolOperatorClustersRegistryProxyABI = [{"constant":true,"inputs":[],"name":"proxyType","outputs":[{"name":"proxyTypeId","type":"uint256"}],"payable":false,"stateMutability":"pure","type":"function"},{"constant":true,"inputs":[],"name":"isDepositable","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"implementation","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"appId","outputs":[{"name":"","type":"bytes32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"kernel","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[{"name":"_kernel","type":"address"},{"name":"_appId","type":"bytes32"},{"name":"_initializePayload","type":"bytes"}],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"payable":true,"stateMutability":"payable","type":"fallback"},{"anonymous":false,"inputs":[{"indexed":false,"name":"sender","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"ProxyDeposit","type":"event"}]
-const ObolOperatorClustersRegistryLogicABI = [{"constant":true,"inputs":[],"name":"getActiveNodeOperatorsCount","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"_nodeOperatorId","type":"uint256"},{"name":"_fullInfo","type":"bool"}],"name":"getNodeOperator","outputs":[{"name":"active","type":"bool"},{"name":"name","type":"string"},{"name":"rewardAddress","type":"address"},{"name":"totalVettedValidators","type":"uint64"},{"name":"totalExitedValidators","type":"uint64"},{"name":"totalAddedValidators","type":"uint64"},{"name":"totalDepositedValidators","type":"uint64"}],"payable":false,"stateMutability":"view","type":"function"}];
+const ObolOperatorClustersRegistryLogicABI = [{"anonymous":false,"inputs":[{"indexed":false,"name":"nodeOperatorId","type":"uint256"},{"indexed":false,"name":"name","type":"string"},{"indexed":false,"name":"rewardAddress","type":"address"},{"indexed":false,"name":"stakingLimit","type":"uint64"}],"name":"NodeOperatorAdded","type":"event"},{"constant":true,"inputs":[],"name":"getActiveNodeOperatorsCount","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"_nodeOperatorId","type":"uint256"},{"name":"_fullInfo","type":"bool"}],"name":"getNodeOperator","outputs":[{"name":"active","type":"bool"},{"name":"name","type":"string"},{"name":"rewardAddress","type":"address"},{"name":"totalVettedValidators","type":"uint64"},{"name":"totalExitedValidators","type":"uint64"},{"name":"totalAddedValidators","type":"uint64"},{"name":"totalDepositedValidators","type":"uint64"}],"payable":false,"stateMutability":"view","type":"function"}]
 const ObolOperatorABI = [{"inputs":[{"internalType":"address","name":"_feeRecipient","type":"address"},{"internalType":"uint256","name":"_feeShare","type":"uint256"},{"internalType":"contract ERC20","name":"_stETH","type":"address"},{"internalType":"contract ERC20","name":"_wstETH","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"Invalid_Address","type":"error"},{"inputs":[],"name":"Invalid_FeeRecipient","type":"error"},{"inputs":[{"internalType":"uint256","name":"fee","type":"uint256"}],"name":"Invalid_FeeShare","type":"error"},{"inputs":[],"name":"distribute","outputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"feeRecipient","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"feeShare","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"rescueFunds","outputs":[{"internalType":"uint256","name":"balance","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"splitWallet","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"pure","type":"function"},{"inputs":[],"name":"stETH","outputs":[{"internalType":"contract ERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"wstETH","outputs":[{"internalType":"contract ERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"}];
 const fullABI = [...ObolOperatorClustersRegistryProxyABI, ...ObolOperatorClustersRegistryLogicABI];
 const SplitMainABI = [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"Create2Error","type":"error"},{"inputs":[],"name":"CreateError","type":"error"},{"inputs":[{"internalType":"address","name":"newController","type":"address"}],"name":"InvalidNewController","type":"error"},{"inputs":[{"internalType":"uint256","name":"accountsLength","type":"uint256"},{"internalType":"uint256","name":"allocationsLength","type":"uint256"}],"name":"InvalidSplit__AccountsAndAllocationsMismatch","type":"error"},{"inputs":[{"internalType":"uint256","name":"index","type":"uint256"}],"name":"InvalidSplit__AccountsOutOfOrder","type":"error"},{"inputs":[{"internalType":"uint256","name":"index","type":"uint256"}],"name":"InvalidSplit__AllocationMustBePositive","type":"error"},{"inputs":[{"internalType":"uint32","name":"allocationsSum","type":"uint32"}],"name":"InvalidSplit__InvalidAllocationsSum","type":"error"},{"inputs":[{"internalType":"uint32","name":"distributorFee","type":"uint32"}],"name":"InvalidSplit__InvalidDistributorFee","type":"error"},{"inputs":[{"internalType":"bytes32","name":"hash","type":"bytes32"}],"name":"InvalidSplit__InvalidHash","type":"error"},{"inputs":[{"internalType":"uint256","name":"accountsLength","type":"uint256"}],"name":"InvalidSplit__TooFewAccounts","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"}],"name":"Unauthorized","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"split","type":"address"}],"name":"CancelControlTransfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"split","type":"address"},{"indexed":true,"internalType":"address","name":"previousController","type":"address"},{"indexed":true,"internalType":"address","name":"newController","type":"address"}],"name":"ControlTransfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"split","type":"address"}],"name":"CreateSplit","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"split","type":"address"},{"indexed":true,"internalType":"contract ERC20","name":"token","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":true,"internalType":"address","name":"distributorAddress","type":"address"}],"name":"DistributeERC20","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"split","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":true,"internalType":"address","name":"distributorAddress","type":"address"}],"name":"DistributeETH","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"split","type":"address"},{"indexed":true,"internalType":"address","name":"newPotentialController","type":"address"}],"name":"InitiateControlTransfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"split","type":"address"}],"name":"UpdateSplit","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":false,"internalType":"uint256","name":"ethAmount","type":"uint256"},{"indexed":false,"internalType":"contract ERC20[]","name":"tokens","type":"address[]"},{"indexed":false,"internalType":"uint256[]","name":"tokenAmounts","type":"uint256[]"}],"name":"Withdrawal","type":"event"},{"inputs":[],"name":"PERCENTAGE_SCALE","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"}],"name":"acceptControl","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"}],"name":"cancelControlTransfer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint32[]","name":"percentAllocations","type":"uint32[]"},{"internalType":"uint32","name":"distributorFee","type":"uint32"},{"internalType":"address","name":"controller","type":"address"}],"name":"createSplit","outputs":[{"internalType":"address","name":"split","type":"address"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"},{"internalType":"contract ERC20","name":"token","type":"address"},{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint32[]","name":"percentAllocations","type":"uint32[]"},{"internalType":"uint32","name":"distributorFee","type":"uint32"},{"internalType":"address","name":"distributorAddress","type":"address"}],"name":"distributeERC20","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"},{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint32[]","name":"percentAllocations","type":"uint32[]"},{"internalType":"uint32","name":"distributorFee","type":"uint32"},{"internalType":"address","name":"distributorAddress","type":"address"}],"name":"distributeETH","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"}],"name":"getController","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"contract ERC20","name":"token","type":"address"}],"name":"getERC20Balance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"getETHBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"}],"name":"getHash","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"}],"name":"getNewPotentialController","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"}],"name":"makeSplitImmutable","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint32[]","name":"percentAllocations","type":"uint32[]"},{"internalType":"uint32","name":"distributorFee","type":"uint32"}],"name":"predictImmutableSplitAddress","outputs":[{"internalType":"address","name":"split","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"},{"internalType":"address","name":"newController","type":"address"}],"name":"transferControl","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"},{"internalType":"contract ERC20","name":"token","type":"address"},{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint32[]","name":"percentAllocations","type":"uint32[]"},{"internalType":"uint32","name":"distributorFee","type":"uint32"},{"internalType":"address","name":"distributorAddress","type":"address"}],"name":"updateAndDistributeERC20","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"},{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint32[]","name":"percentAllocations","type":"uint32[]"},{"internalType":"uint32","name":"distributorFee","type":"uint32"},{"internalType":"address","name":"distributorAddress","type":"address"}],"name":"updateAndDistributeETH","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"split","type":"address"},{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint32[]","name":"percentAllocations","type":"uint32[]"},{"internalType":"uint32","name":"distributorFee","type":"uint32"}],"name":"updateSplit","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"walletImplementation","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"uint256","name":"withdrawETH","type":"uint256"},{"internalType":"contract ERC20[]","name":"tokens","type":"address[]"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},{"stateMutability":"payable","type":"receive"}]
@@ -115,16 +116,43 @@ export const ether_obol = {
     const PERIOD_CONFIG = {
       '1m': {days: 30, stepDays: 3},
       '1y': {days: 365, stepDays: 30},
-      'all': {days: 720, stepDays: 60} // 'all' 設為 2 年，每 30 天一個數據點
+      'all': {days: 1000, stepDays: 60} // 'all' 設為 2 年，每 30 天一個數據點
     };
 
     const { days, stepDays } = PERIOD_CONFIG[period];
     const latestBlock = await provider.getBlockNumber();
     const latestBlkNum = BigInt(latestBlock);
     
-    const startBlkNum = latestBlkNum - BigInt(Math.floor(days * BLOCKS_PER_DAY));
-    const stepBlocks = BigInt(Math.floor(stepDays * BLOCKS_PER_DAY));
+    let startBlkNum = latestBlkNum - BigInt(Math.floor(days * BLOCKS_PER_DAY));
+    let stepBlocks = BigInt(Math.floor(stepDays * BLOCKS_PER_DAY));
     
+    if (period === 'all') {
+      try {
+        const eventTopic = obolOperatorClustersRegistryContract.getEvent('NodeOperatorAdded(uint256,string,address,uint64)').getFragment().topicHash;
+        const hexId = ethers.toBeHex(id,32)
+        console.log('✅ 註冊事件主題:', eventTopic)
+        const eventURL = `https://api.etherscan.io/v2/api?chainid=1&module=logs&action=getLogs&fromBlock=${startBlkNum}&toBlock=${latestBlkNum}&topic0=${eventTopic}&page=1&offset=1000&apikey=${EtherscanAPIKey}`
+        const response = await fetch(eventURL);
+        const data = await response.json();
+        console.log('✅ 註冊事件:', data)
+        if (data.result.length > 0) {
+          console.log('✅ 註冊事件:', data.result)
+          for (const event of data.result) {
+            if (event.data.includes(hexId)) {
+              startBlkNum = BigInt(event.blockNumber);
+              const timestamp = event.timeStamp;
+              const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+              console.log('✅ 註冊事件:', startBlkNum, date)
+            }
+          }
+        } else {
+          console.log('❌ 註冊事件不存在')
+        }
+      } catch (error) {
+        console.error('Error in getObolOperatorHistoryValidators:', error);
+        throw error;
+      }
+    }
     // 生成所有需要查詢的區塊號
     const blocks = [];
     for (let b = startBlkNum; b <= latestBlkNum; b += stepBlocks) {
@@ -214,21 +242,15 @@ export const ether_obol = {
     return splitWallet;
   },
   getObolOperatorRewardshare: async (splitWallet) => {
-    const url = `https://api.etherscan.io/api?module=account&action=txlistinternal&address=${splitWallet}&startblock=0&endblock=99999999&sort=desc&apikey=${EtherscanAPIKey}`;
-    console.log('Fetching transactions for split wallet:', splitWallet);
+    const url = `https://api.etherscan.io/v2/api?chainid=1&module=account&action=txlistinternal&address=${splitWallet}&startblock=0&endblock=99999999&sort=desc&apikey=${EtherscanAPIKey}`;
     const transactions = await fetch(url).then(res => res.json()).then(data => data.result);
-    console.log('Transactions:', transactions);
     const createTx = transactions.find(tx => tx.type == "create2")
-    console.log('Create tx:', createTx);
     const createOriginTx = await etherscanProvider.getTransaction(createTx.hash);
-    console.log('Create origin tx:', createOriginTx.data);
     const decodedData = SplitMainInterface.decodeFunctionData('createSplit', createOriginTx.data);
-    console.log('Decoded data:', decodedData);
     if (decodedData) {
       const rewardAddress = decodedData[0];
       const rewardShare = decodedData[1];
-      console.log('Reward address:', rewardAddress);
-      console.log('Reward share:', rewardShare);
+
       return {rewardAddress,rewardShare};
     } else {
       throw new Error('Failed to decode createSplit function data');
@@ -236,11 +258,11 @@ export const ether_obol = {
   },
   getObolOperatorClaimableReward: async (rewardAddresses) => {
     if(rewardAddresses.length >= 1){
-      const promises = rewardAddresses.map(async (rewardAddress) => {
-        const claimableReward = await splitMainContract.getERC20Balance(rewardAddress,WSTETH_CONTRACT);
-        return {rewardAddress,claimableReward};
-      });
-      const results = await Promise.all(promises);
+      // 索引陣列
+      const rewardAddressIndices = Array.from({length: rewardAddresses.length}, (_, i) => i);
+      // 透過索引陣列去映射出對應的Call格式
+      const rewardCalls = rewardAddressIndices.map(index => wrapCall(SplitMain, SplitMainABI, "getERC20Balance", [rewardAddresses[index],WSTETH_CONTRACT]));
+      const results = await multicall(rewardCalls, provider);
       return results;
     }else{
       throw new Error('No reward addresses provided');
@@ -250,10 +272,10 @@ export const ether_obol = {
 
 
   getObolOperatorTokenTx: async (splitWallet) => {
-    const url = `https://api.etherscan.io/api?module=account&action=tokentx&address=${splitWallet}&startblock=0&endblock=99999999&sort=desc&apikey=${EtherscanAPIKey}`;
-    console.log('Fetching transactions for split wallet:', splitWallet);
+    const url = `https://api.etherscan.io/v2/api?chainid=1&module=account&action=tokentx&address=${splitWallet}&startblock=0&endblock=99999999&sort=desc&apikey=${EtherscanAPIKey}`;
+
     const transactions = await fetch(url).then(res => res.json()).then(data => data.result);
-    const tokenTx = transactions.find(tx => tx.input.startsWith("0xe4fc6b6d"));
+    const tokenTx = transactions.find(tx => tx.input.startsWith("0xe4fc6b6  d"));
     return tokenTx;
   },
 

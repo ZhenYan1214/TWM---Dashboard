@@ -427,7 +427,11 @@
           <canvas v-for="period in availablePeriods"
                   :key="period.value"
                   :ref="`chartCanvas_${period.value}`" 
-                  v-show="selectedPeriod === period.value && !charts[period.value].loading && !charts[period.value].error && charts[period.value].data"
+                  :style="{ 
+                    display: selectedPeriod === period.value && !charts[period.value].loading && !charts[period.value].error && charts[period.value].data ? 'block' : 'none',
+                    width: '100%',
+                    height: '100%'
+                  }"
                   class="chart-canvas"></canvas>
           
           <!-- Error state -->
@@ -437,6 +441,7 @@
             <div class="error-actions">
               <button @click="loadChartData(selectedPeriod)" class="retry-btn">重試載入</button>
               <button @click="recreateChart(selectedPeriod)" class="debug-btn">重新創建圖表</button>
+              <button @click="renderSimpleChart(selectedPeriod)" class="debug-btn">測試簡化渲染</button>
             </div>
           </div>
           
@@ -465,10 +470,11 @@ import {
   CategoryScale,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 } from 'chart.js'
 
-// 只註冊必要的 Chart.js 組件
+// 註冊所有必要的 Chart.js 組件
 Chart.register(
   LineController,
   LineElement, 
@@ -477,7 +483,8 @@ Chart.register(
   CategoryScale,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 )
 
 export default {
@@ -744,9 +751,8 @@ export default {
         console.log('🔍 開始載入可領餘額:', rewardAddresses)
         
         const claimableData = await ether_obol.getObolOperatorClaimableReward(rewardAddresses)
-        this.claimableRewards = claimableData
-        console.log('✅ 可領餘額載入成功:', claimableData)
-        
+        this.claimableRewards = claimableData.map(i => i[0])
+        console.log('✅ 可領餘額載入成功:', this.claimableRewards)
       } catch (error) {
         console.error('❌ 載入可領餘額失敗:', error)
         this.claimableRewardsError = `載入失敗: ${error.message || '未知錯誤'}`
@@ -903,11 +909,23 @@ export default {
         return null
       }
       
-      const found = this.claimableRewards.find(item => 
-        item.rewardAddress && item.rewardAddress.toLowerCase() === rewardAddress.toLowerCase()
+      if (!this.rewardShareData || !this.rewardShareData.rewardAddress) {
+        return null
+      }
+      
+      // 根據地址在 rewardShareData.rewardAddress 中的索引來獲取對應的可領餘額
+      const addressIndex = this.rewardShareData.rewardAddress.findIndex(addr => 
+        addr.toLowerCase() === rewardAddress.toLowerCase()
       )
       
-      return found ? found.claimableReward : null
+
+      
+      if (addressIndex >= 0 && addressIndex < this.claimableRewards.length) {
+        const reward = this.claimableRewards[addressIndex]
+        return reward
+      }
+      
+      return null
     },
 
     // 格式化可領餘額
@@ -919,9 +937,13 @@ export default {
                this.claimableRewardsError ? '載入失敗' : 'N/A'
       }
       
-      // 將 wei 轉換為 wstETH (18 位小數)
-      const wstETHAmount = parseFloat(claimableReward.toString()) / Math.pow(10, 18)
-      return this.formatWstETHAmount(wstETHAmount)
+      // 將 BigInt wei 轉換為 wstETH (18 位小數)
+      const wstETHAmount = Number(claimableReward) / Math.pow(10, 18)
+      const formatted = this.formatWstETHAmount(wstETHAmount)
+      
+
+      
+      return formatted
     },
 
     // 檢查是否有可領餘額
@@ -931,7 +953,7 @@ export default {
         return false
       }
       
-      const wstETHAmount = parseFloat(claimableReward.toString()) / Math.pow(10, 18)
+      const wstETHAmount = Number(claimableReward) / Math.pow(10, 18)
       return wstETHAmount > 0
     },
 
@@ -1044,11 +1066,14 @@ export default {
       console.log('🎯 開始渲染所有圖表')
       // 使用 nextTick 確保 DOM 已完全更新
       this.$nextTick(() => {
-        this.availablePeriods.forEach(period => {
-          if (this.charts[period.value].data && !this.charts[period.value].loading) {
-            this.renderChart(period.value)
-          }
-        })
+        // 額外延遲確保所有元素都已渲染
+        setTimeout(() => {
+          this.availablePeriods.forEach(period => {
+            if (this.charts[period.value].data && !this.charts[period.value].loading) {
+              this.renderChart(period.value)
+            }
+          })
+        }, 100)
       })
     },
 
@@ -1058,19 +1083,28 @@ export default {
       
       // 基本檢查
       if (!Chart) {
+        console.error('Chart.js 未載入')
         this.charts[period].error = 'Chart.js 未載入'
         return
       }
 
       const chartData = this.charts[period].data
-      if (!chartData || !chartData.length) {
+      if (!chartData || !Array.isArray(chartData) || chartData.length === 0) {
         console.log(`⚠️ 沒有數據，跳過渲染: ${period}`)
+        this.charts[period].error = '沒有可用的數據'
         return
       }
+
+      console.log(`📊 圖表數據:`, chartData)
 
       // 使用 nextTick 確保 DOM 已更新
       this.$nextTick(() => {
         const canvas = this.$refs[`chartCanvas_${period}`]
+        console.log(`🔍 查找 Canvas:`, canvas)
+        
+        // 調試 Canvas 狀態
+        this.debugCanvasState(period)
+        
         if (!canvas || !canvas[0]) {
           console.log(`⚠️ Canvas 不存在，延遲渲染: ${period}`)
           // 增加重試次數限制，避免無限循環
@@ -1080,6 +1114,7 @@ export default {
           
           if (this.charts[period].retryCount < 5) {
             this.charts[period].retryCount++
+            console.log(`🔄 重試渲染 (${this.charts[period].retryCount}/5): ${period}`)
             setTimeout(() => this.renderChart(period), 200)
           } else {
             console.error(`❌ 圖表渲染失敗: ${period} - Canvas 無法找到`)
@@ -1093,17 +1128,40 @@ export default {
           // 清理舊圖表
           this.destroyChart(period)
 
-          // 確保 Canvas 可見
+          // 確保 Canvas 可見並設置正確尺寸
           const canvasElement = canvas[0]
+          console.log(`🎨 設置 Canvas 樣式:`, canvasElement)
+          
+          // 強制設置 Canvas 樣式
           canvasElement.style.display = 'block'
           canvasElement.style.width = '100%'
           canvasElement.style.height = '100%'
+          canvasElement.style.position = 'relative'
+          
+          // 設置 Canvas 的實際尺寸
+          const container = canvasElement.parentElement
+          if (container) {
+            const rect = container.getBoundingClientRect()
+            canvasElement.width = rect.width
+            canvasElement.height = rect.height
+            console.log(`📏 Canvas 尺寸:`, rect.width, 'x', rect.height)
+          }
 
           // 準備數據
           const { labels, datasets } = this.prepareChartData(chartData)
           
+          console.log(`📈 準備好的圖表數據:`, { labels, datasets })
+          
+          if (labels.length === 0 || datasets.length === 0) {
+            console.warn(`⚠️ 圖表數據為空: ${period}`)
+            this.charts[period].error = '圖表數據處理失敗'
+            return
+          }
+
           // 創建新圖表
           const ctx = canvasElement.getContext('2d')
+          console.log(`🎨 創建圖表實例: ${period}`)
+          
           this.charts[period].instance = new Chart(ctx, {
             type: 'line',
             data: { labels, datasets },
@@ -1124,20 +1182,47 @@ export default {
 
     // 數據準備方法
     prepareChartData(chartData) {
-      const labels = chartData.map(item => {
-        const date = new Date(item.timestamp)
-        return date.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })
+      console.log('📊 準備圖表數據:', chartData)
+      
+      if (!chartData || !Array.isArray(chartData) || chartData.length === 0) {
+        console.warn('圖表數據為空或格式不正確')
+        return { labels: [], datasets: [] }
+      }
+
+      // 按時間戳排序
+      const sortedData = chartData.sort((a, b) => a.timestamp - b.timestamp)
+      
+      const labels = sortedData.map(item => {
+        const date = new Date(item.timestamp) // timestamp 已經是毫秒為單位
+        return date.toLocaleDateString('zh-TW', { 
+          month: 'numeric', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
       })
 
-      const totalAddedData = chartData.map(item => 
-        Math.max(0, Number(item.data?.totalAddedValidators) || 0)
-      )
-      const totalDepositedData = chartData.map(item => 
-        Math.max(0, Number(item.data?.totalDepositedValidators) || 0)
-      )
-      const totalExitedData = chartData.map(item => 
-        Math.max(0, Number(item.data?.totalExitedValidators) || 0)
-      )
+      const totalAddedData = sortedData.map(item => {
+        const value = item.data?.totalAddedValidators || item.totalAddedValidators || 0
+        return Math.max(0, Number(value))
+      })
+      
+      const totalDepositedData = sortedData.map(item => {
+        const value = item.data?.totalDepositedValidators || item.totalDepositedValidators || 0
+        return Math.max(0, Number(value))
+      })
+      
+      const totalExitedData = sortedData.map(item => {
+        const value = item.data?.totalExitedValidators || item.totalExitedValidators || 0
+        return Math.max(0, Number(value))
+      })
+
+      console.log('📈 處理後的數據:', {
+        labels: labels.length,
+        totalAdded: totalAddedData,
+        totalDeposited: totalDepositedData,
+        totalExited: totalExitedData
+      })
 
       const datasets = [
         {
@@ -1146,7 +1231,8 @@ export default {
           borderColor: '#3B82F6',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',
           borderWidth: 2,
-          fill: false
+          fill: false,
+          tension: 0.4
         },
         {
           label: 'Active Validators', 
@@ -1154,7 +1240,8 @@ export default {
           borderColor: '#10B981',
           backgroundColor: 'rgba(16, 185, 129, 0.1)',
           borderWidth: 2,
-          fill: false
+          fill: false,
+          tension: 0.4
         },
         {
           label: 'Exited Validators',
@@ -1162,27 +1249,76 @@ export default {
           borderColor: '#9CA3AF',
           backgroundColor: 'rgba(156, 163, 175, 0.1)',
           borderWidth: 2,
-          fill: false
+          fill: false,
+          tension: 0.4
         }
       ]
 
       return { labels, datasets }
     },
     
-    // 5. 圖表配置
+    // 圖表配置
     getChartOptions() {
       return {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: true, position: 'top' },
-          tooltip: { mode: 'index', intersect: false }
+          legend: { 
+            display: true, 
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              padding: 20,
+              font: {
+                size: 12,
+                weight: '500'
+              }
+            }
+          },
+          tooltip: { 
+            mode: 'index', 
+            intersect: false,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            borderColor: 'rgba(59, 130, 246, 0.3)',
+            borderWidth: 1
+          }
         },
         scales: {
-          x: { display: true, grid: { display: false } },
-          y: { display: true, beginAtZero: true }
+          x: { 
+            display: true, 
+            grid: { 
+              display: true,
+              color: 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              maxRotation: 45,
+              font: {
+                size: 11
+              }
+            }
+          },
+          y: { 
+            display: true, 
+            beginAtZero: true,
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              font: {
+                size: 11
+              }
+            }
+          }
         },
-        interaction: { mode: 'index', intersect: false }
+        interaction: { mode: 'index', intersect: false },
+        elements: {
+          point: {
+            radius: 3,
+            hoverRadius: 5
+          }
+        }
       }
     },
 
@@ -1248,6 +1384,65 @@ export default {
           }, 100)
         })
       }
+    },
+
+    // 調試方法：檢查 Canvas 元素狀態
+    debugCanvasState(period) {
+      console.log(`🔍 調試 Canvas 狀態: ${period}`)
+      
+      const canvas = this.$refs[`chartCanvas_${period}`]
+      console.log('Canvas ref:', canvas)
+      
+      if (canvas && canvas[0]) {
+        const canvasElement = canvas[0]
+        console.log('Canvas element:', canvasElement)
+        console.log('Canvas style:', canvasElement.style)
+        console.log('Canvas dimensions:', canvasElement.width, 'x', canvasElement.height)
+        console.log('Canvas offset:', canvasElement.offsetWidth, 'x', canvasElement.offsetHeight)
+        console.log('Canvas getBoundingClientRect:', canvasElement.getBoundingClientRect())
+        
+        const container = canvasElement.parentElement
+        if (container) {
+          console.log('Container:', container)
+          console.log('Container dimensions:', container.offsetWidth, 'x', container.offsetHeight)
+        }
+      } else {
+        console.log('Canvas not found')
+      }
+    },
+
+    // 簡化的渲染方法用於測試
+    renderSimpleChart(period) {
+      console.log(`🎯 簡化渲染測試: ${period}`)
+      
+      const canvas = this.$refs[`chartCanvas_${period}`]
+      if (!canvas || !canvas[0]) {
+        console.error('Canvas not found for simple render')
+        return
+      }
+
+      const canvasElement = canvas[0]
+      
+      // 強制顯示 Canvas
+      canvasElement.style.display = 'block'
+      canvasElement.style.width = '100%'
+      canvasElement.style.height = '100%'
+      canvasElement.style.border = '1px solid red' // 調試邊框
+      
+      // 設置 Canvas 尺寸
+      canvasElement.width = 800
+      canvasElement.height = 400
+      
+      const ctx = canvasElement.getContext('2d')
+      
+      // 繪製一個簡單的測試圖形
+      ctx.fillStyle = 'blue'
+      ctx.fillRect(10, 10, 100, 100)
+      
+      ctx.fillStyle = 'red'
+      ctx.fillRect(120, 10, 100, 100)
+      
+      console.log('✅ 簡化渲染測試完成')
     }
   },
 
@@ -2458,7 +2653,7 @@ export default {
 .chart-container {
   height: 400px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   background: var(--bg-secondary);
   border-radius: 8px;
   margin: 24px;

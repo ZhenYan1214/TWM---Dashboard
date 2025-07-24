@@ -65,8 +65,76 @@
           重新載入
         </button>
       </div>
+      
+      <!-- 搜尋框 -->
+      <div class="search-section">
+        <div class="search-container">
+          <div class="search-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+          </div>
+          <input 
+            type="text" 
+            v-model="searchQuery" 
+            placeholder="搜尋操作者名稱..." 
+            class="search-input"
+            @input="handleSearch"
+          />
+          <button 
+            v-if="searchQuery" 
+            @click="clearSearch" 
+            class="clear-search-btn"
+            title="清除搜尋"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="m15 9-6 6"/>
+              <path d="m9 9 6 6"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- 篩選標籤 -->
+      <div class="filter-section">
+        <div class="filter-tabs">
+          <button 
+            @click="setActiveFilter('all')" 
+            :class="['filter-tab', { active: activeFilter === 'all' }]"
+          >
+            全部 ({{ totalOperators }})
+          </button>
+          <button 
+            @click="setActiveFilter('lido-obol')" 
+            :class="['filter-tab', { active: activeFilter === 'lido-obol' }]"
+          >
+            Lido x Obol ({{ lidoObolCount }})
+          </button>
+          <button 
+            @click="setActiveFilter('lido-ssv')" 
+            :class="['filter-tab', { active: activeFilter === 'lido-ssv' }]"
+          >
+            Lido x SSV ({{ lidoSsvCount }})
+          </button>
+          <button 
+            @click="setActiveFilter('clever-chameleon')" 
+            :class="['filter-tab', { active: activeFilter === 'clever-chameleon' }]"
+          >
+            Lido x Obol: Clever Chameleon ({{ cleverChameleonCount }})
+          </button>
+          <button 
+            @click="setActiveFilter('zippy-zorilla')" 
+            :class="['filter-tab', { active: activeFilter === 'zippy-zorilla' }]"
+          >
+            Lido x SSV: Zippy Zorilla ({{ zippyZorillaCount }})
+          </button>
+        </div>
+      </div>
+      
       <div class="distribution-grid">
-        <div v-for="(cluster, index) in clusterCards" :key="index" 
+        <div v-for="(cluster, index) in filteredClusterCards" :key="index" 
              class="distribution-card" 
              :class="{ 'error-card': cluster.error }"
              @click="cluster.error ? handleErrorCardClick() : goToOperatorDetail(cluster, index)" 
@@ -75,9 +143,9 @@
           <div class="card-header">
             <div class="card-title-section">
               <div class="operator-number">
-                #{{ index }}
+                #{{ cluster.originalIndex }}
               </div>
-              <span class="card-title">{{ cluster.name || `Operator #${index}` }}</span>
+              <span class="card-title">{{ cluster.name || `Operator #${cluster.originalIndex}` }}</span>
             </div>
           </div>
           
@@ -158,7 +226,11 @@ export default {
       // 快取配置
       cacheKey: 'obol_clusters_data',
       cacheExpiryTime: 60 * 60 * 1000, // 1小時快取過期時間
-      lastFetchTime: null
+      lastFetchTime: null,
+      // 篩選狀態
+      activeFilter: 'all', // 'all', 'lido-obol', 'lido-ssv'
+      // 搜尋狀態
+      searchQuery: '',
     }
   },
   computed: {
@@ -208,6 +280,53 @@ export default {
           { ...cluster, index } : max
       }, {})
       return mostActive.name || `Operator #${mostActive.index}`
+    },
+    totalOperators() {
+      return this.clusterCards.length;
+    },
+    lidoObolCount() {
+      return this.clusterCards.filter(cluster => cluster.name && cluster.name.includes('Lido x Obol')).length;
+    },
+    lidoSsvCount() {
+      return this.clusterCards.filter(cluster => cluster.name && cluster.name.includes('Lido x SSV')).length;
+    },
+    cleverChameleonCount() {
+      return this.clusterCards.filter(cluster => cluster.name && cluster.name.includes('Lido x Obol: Clever Chameleon')).length;
+    },
+    zippyZorillaCount() {
+      return this.clusterCards.filter(cluster => cluster.name && cluster.name.includes('Lido x SSV: Zippy Zorilla')).length;
+    },
+    filteredClusterCards() {
+      let filtered = this.clusterCards.map((cluster, index) => ({
+        ...cluster,
+        originalIndex: index
+      }));
+      
+      // 先進行篩選
+      if (this.activeFilter !== 'all') {
+        filtered = filtered.filter(cluster => {
+          if (this.activeFilter === 'lido-obol') {
+            return cluster.name && cluster.name.includes('Lido x Obol');
+          } else if (this.activeFilter === 'lido-ssv') {
+            return cluster.name && cluster.name.includes('Lido x SSV');
+          } else if (this.activeFilter === 'clever-chameleon') {
+            return cluster.name && cluster.name.includes('Lido x Obol: Clever Chameleon');
+          } else if (this.activeFilter === 'zippy-zorilla') {
+            return cluster.name && cluster.name.includes('Lido x SSV: Zippy Zorilla');
+          }
+          return false;
+        });
+      }
+      
+      // 再進行搜尋
+      if (this.searchQuery.trim()) {
+        const query = this.searchQuery.toLowerCase().trim();
+        filtered = filtered.filter(cluster => 
+          cluster.name && cluster.name.toLowerCase().includes(query)
+        );
+      }
+      
+      return filtered;
     }
   },
   async mounted() {
@@ -440,7 +559,7 @@ export default {
       
       // 發送事件到父組件，傳遞操作者數據
       const operatorData = {
-        operatorId: index,
+        operatorId: cluster.originalIndex,
         operatorData: cluster
       }
       
@@ -452,6 +571,20 @@ export default {
     handleErrorCardClick() {
       // 錯誤卡片不執行任何操作
       console.log('Error card clicked - no action taken')
+    },
+    setActiveFilter(filter) {
+      this.activeFilter = filter;
+    },
+    
+    // 處理搜尋
+    handleSearch() {
+      // 搜尋是即時的，不需要額外處理
+      console.log('搜尋查詢:', this.searchQuery);
+    },
+    
+    // 清除搜尋
+    clearSearch() {
+      this.searchQuery = '';
     }
   }
 }
@@ -694,6 +827,147 @@ export default {
   font-size: 20px;
   font-weight: 700;
   color: var(--brand-primary);
+}
+
+.search-section {
+  margin-bottom: 16px;
+  margin-left: 8px;
+  margin-right: 8px;
+}
+
+.search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 12px;
+  padding: 4px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.05);
+}
+
+.search-container:focus-within {
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.search-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-primary);
+  padding: 8px 12px;
+  min-width: 0;
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.clear-search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.clear-search-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  transform: scale(1.05);
+}
+
+.clear-search-btn:active {
+  transform: scale(0.95);
+}
+
+.filter-section {
+  margin-bottom: 18px;
+  margin-left: 8px;
+  margin-right: 8px;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  padding: 8px 12px;
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: rgba(59, 130, 246, 0.03);
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.filter-tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.filter-tab:hover::before {
+  opacity: 1;
+}
+
+.filter-tab.active {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: var(--brand-primary);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.filter-tab.active::before {
+  opacity: 1;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+}
+
+.filter-tab:hover {
+  border-color: rgba(59, 130, 246, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.filter-tab:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.1);
 }
 
 .refresh-button {
@@ -997,6 +1271,37 @@ export default {
   
   .refresh-button {
     align-self: flex-end;
+  }
+
+  .search-section {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  .search-container {
+    border-radius: 10px;
+  }
+  
+  .search-input {
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+  
+  .filter-section {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .filter-tabs {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+  
+  .filter-tab {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 16px;
   }
   
   .distribution-grid {
