@@ -28,8 +28,6 @@ const multicall = async (calls,provider) => {
 
     const multicallContract = new Contract(MULTICALL3_ADDRESS, MC_ABI, provider);
     const results = await multicallContract.aggregate3.staticCall(encodedCalls);
-    console.log(results);
-    console.log(results[1][1]);
 
     return results.map((result,index) => {
         if(result.success){
