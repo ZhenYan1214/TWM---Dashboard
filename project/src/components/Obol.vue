@@ -78,7 +78,7 @@
           <input 
             type="text" 
             v-model="searchQuery" 
-            placeholder="搜尋操作者名稱..." 
+            placeholder="搜尋Operator..." Op
             class="search-input"
             @input="handleSearch"
           />
@@ -170,7 +170,7 @@
               <div class="address-value" 
                    @click.stop="copyToClipboard(cluster.rewardAddress)" 
                    :title="cluster.rewardAddress">
-                {{ cluster.rewardAddress }}
+                {{ formatAddress(cluster.rewardAddress) }}
               </div>
             </div>
           </div>
@@ -907,8 +907,8 @@ export default {
   padding: 8px 12px;
   border: 1px solid rgba(59, 130, 246, 0.15);
   border-radius: 18px;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.3s ease;
@@ -938,7 +938,7 @@ export default {
   background: rgba(59, 130, 246, 0.1);
   border-color: rgba(59, 130, 246, 0.3);
   color: var(--brand-primary);
-  font-weight: 600;
+  font-weight: 700;
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
 }
 
@@ -1011,7 +1011,7 @@ export default {
   flex-direction: column;
   transition: all 0.3s ease;
   position: relative;
-  min-height: 240px;
+  min-height: 260px;
   max-width: 360px;
   cursor: pointer;
   overflow: hidden;
@@ -1068,8 +1068,8 @@ export default {
 }
 
 .distribution-card .card-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
@@ -1095,16 +1095,16 @@ export default {
 }
 
 .stat-label {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 6px;
-  font-weight: 500;
+  font-weight: 600;
   text-align: center;
   line-height: 1.2;
 }
 
 .stat-value {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -1131,19 +1131,19 @@ export default {
 }
 
 .address-label {
-  font-size: 11px;
+  font-size: 14px;
   color: var(--text-muted);
   margin-bottom: 8px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   text-align: left;
 }
 
 .address-value {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--text-primary);
-  font-weight: 500;
+  font-weight: 600;
   padding: 6px 10px;
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%);
   border: 1px solid rgba(99, 102, 241, 0.15);
@@ -1346,7 +1346,7 @@ export default {
   }
   
   .filter-tab {
-    font-size: 12px;
+    font-size: 13px;
     padding: 6px 10px;
     border-radius: 16px;
   }
@@ -1382,7 +1382,7 @@ export default {
   }
   
   .address-value {
-    font-size: 9px;
+    font-size: 10px;
     padding: 6px 10px;
   }
   
@@ -1425,7 +1425,7 @@ export default {
   }
   
   .filter-tab {
-    font-size: 11px;
+    font-size: 12px;
     padding: 4px 8px;
   }
   
@@ -1448,11 +1448,11 @@ export default {
   }
   
   .address-label {
-    font-size: 9px;
+    font-size: 11px;
   }
   
   .address-value {
-    font-size: 8px;
+    font-size: 11px;
     padding: 4px 8px;
   }
   
@@ -1500,7 +1500,7 @@ export default {
   }
   
   .filter-tab {
-    font-size: 10px;
+    font-size: 11px;
     padding: 3px 6px;
   }
   
@@ -1514,7 +1514,7 @@ export default {
   }
   
   .stat-value {
-    font-size: 16px;
+    font-size: 18px;
   }
   
   .reward-address-section {
@@ -1523,11 +1523,11 @@ export default {
   }
   
   .address-label {
-    font-size: 8px;
+    font-size: 10px;
   }
   
   .address-value {
-    font-size: 7px;
+    font-size: 10px;
     padding: 3px 6px;
   }
   
