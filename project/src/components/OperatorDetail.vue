@@ -246,7 +246,9 @@
           <div class="section-content">
             <h3 class="section-title">wstETH 收益統計</h3>
             <p class="section-description" v-if="wstETHLoading">正在載入 wstETH 收益數據...</p>
-            <p class="section-description" v-else-if="wstETHError">{{ wstETHError }}</p>
+            <p class="section-description" v-else-if="wstETHError">
+              {{ wstETHError === '載入失敗: Etherscan API 錯誤: No transactions found' ? '沒有分配紀錄，無法預估及統計' : wstETHError }}
+            </p>
             <p class="section-description" v-else-if="wstETHSummary">
               共 {{ incomingTransactionsCount }} 筆收入記錄
             </p>
@@ -2230,11 +2232,13 @@ export default {
 /* wstETH 統計卡片 */
 .wsteth-stats-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
   margin: 24px 0;
   padding-top: 20px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
+  width: 100%;
+  max-width: 100%;
 }
 
 .stats-card {
@@ -2301,6 +2305,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .stats-card .card-label {
@@ -2309,6 +2314,7 @@ export default {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  word-wrap: break-word;
 }
 
 .stats-card .card-value {
@@ -2316,6 +2322,8 @@ export default {
   font-weight: 700;
   color: var(--text-primary);
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .stats-card .card-value.negative {
@@ -2769,12 +2777,26 @@ export default {
 }
 
 /* Responsive Design */
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
   .stats-overview-section {
     gap: 20px;
   }
   
+  .wsteth-stats-cards {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
+  }
+}
 
+@media (max-width: 1200px) {
+  .stats-overview-section {
+    gap: 18px;
+  }
+  
+  .wsteth-stats-cards {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+  }
 }
 
 @media (max-width: 1024px) {
@@ -2796,7 +2818,7 @@ export default {
   }
   
   .wsteth-stats-cards {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 16px;
   }
   
@@ -2823,6 +2845,18 @@ export default {
 
   .chart-container {
     height: 320px;
+  }
+  
+  .stats-card {
+    padding: 18px;
+  }
+  
+  .stats-card .card-value {
+    font-size: 22px;
+  }
+  
+  .stats-card .card-label {
+    font-size: 11px;
   }
 }
 
@@ -2933,19 +2967,6 @@ export default {
   .chart-container {
     height: 280px;
   }
-}
-
-@media (max-width: 480px) {
-  .overview-section,
-  .stats-overview-section,
-  .contract-address-section,
-  .split-wallet-section,
-  .reward-share-section,
-  .wsteth-rewards-section,
-  .historical-trends-section {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
   
   .stats-card {
     padding: 16px;
@@ -2961,61 +2982,96 @@ export default {
     height: 40px;
   }
   
+  .stats-card .card-label {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  .overview-section,
+  .stats-overview-section,
+  .contract-address-section,
+  .split-wallet-section,
+  .reward-share-section,
+  .wsteth-rewards-section,
+  .historical-trends-section {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  
+  .stats-card {
+    padding: 14px;
+    gap: 10px;
+  }
+  
+  .stats-card .card-value {
+    font-size: 18px;
+  }
+  
+  .stats-card .card-icon {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .stats-card .card-label {
+    font-size: 9px;
+  }
+  
   .transaction-item {
-    padding: 12px;
+    padding: 10px;
   }
   
   .transactions-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 6px;
   }
   
   .split-wallet-section .address-description {
-    font-size: 12px;
+    font-size: 11px;
   }
   
   .share-item {
-    padding: 12px;
+    padding: 10px;
   }
   
   .percentage-value {
-    font-size: 16px;
-  }
-  
-  .header-title {
     font-size: 14px;
   }
   
+  .header-title {
+    font-size: 13px;
+  }
+  
   .address-value {
-    font-size: 12px;
+    font-size: 11px;
     flex-wrap: wrap;
   }
   
   .share-address-info {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
   
   .claimable-reward-section {
-    padding: 8px;
+    padding: 6px;
   }
   
   .reward-amount {
-    font-size: 14px;
+    font-size: 13px;
   }
   
   .header-status {
-    font-size: 11px;
-    padding: 2px 6px;
+    font-size: 10px;
+    padding: 1px 4px;
   }
 
   .chart-header {
-    padding: 12px;
-    gap: 10px;
+    padding: 10px;
+    gap: 8px;
   }
 
   .chart-title {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .period-selector {
@@ -3025,13 +3081,141 @@ export default {
 
   .period-btn {
     flex: 1;
-    font-size: 12px;
-    padding: 6px 8px;
+    font-size: 11px;
+    padding: 4px 6px;
   }
 
   .chart-container {
-    height: 250px;
-    margin: 16px;
+    height: 220px;
+    margin: 12px;
+  }
+  
+  .operator-name {
+    font-size: 20px;
+  }
+  
+  .overview-card {
+    padding: 16px 12px;
+  }
+  
+  .overview-card .main-amount {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .overview-section,
+  .stats-overview-section,
+  .contract-address-section,
+  .split-wallet-section,
+  .reward-share-section,
+  .wsteth-rewards-section,
+  .historical-trends-section {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  
+  .stats-card {
+    padding: 12px;
+    gap: 8px;
+  }
+  
+  .stats-card .card-value {
+    font-size: 16px;
+  }
+  
+  .stats-card .card-icon {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .stats-card .card-label {
+    font-size: 8px;
+  }
+  
+  .transaction-item {
+    padding: 8px;
+  }
+  
+  .transactions-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .split-wallet-section .address-description {
+    font-size: 10px;
+  }
+  
+  .share-item {
+    padding: 8px;
+  }
+  
+  .percentage-value {
+    font-size: 12px;
+  }
+  
+  .header-title {
+    font-size: 12px;
+  }
+  
+  .address-value {
+    font-size: 10px;
+    flex-wrap: wrap;
+  }
+  
+  .share-address-info {
+    margin-bottom: 4px;
+  }
+  
+  .claimable-reward-section {
+    padding: 4px;
+  }
+  
+  .reward-amount {
+    font-size: 12px;
+  }
+  
+  .header-status {
+    font-size: 9px;
+    padding: 1px 3px;
+  }
+
+  .chart-header {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .chart-title {
+    font-size: 16px;
+  }
+
+  .period-selector {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .period-btn {
+    flex: 1;
+    font-size: 10px;
+    padding: 3px 4px;
+  }
+
+  .chart-container {
+    height: 200px;
+    margin: 8px;
+  }
+  
+  .operator-name {
+    font-size: 18px;
+  }
+  
+  .overview-card {
+    padding: 12px 8px;
+  }
+  
+  .overview-card .main-amount {
+    font-size: 24px;
   }
 }
 

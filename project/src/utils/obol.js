@@ -116,7 +116,7 @@ export const ether_obol = {
     const PERIOD_CONFIG = {
       '1m': {days: 30, stepDays: 3},
       '1y': {days: 365, stepDays: 30},
-      'all': {days: 1000, stepDays: 60} // 'all' 設為 2 年，每 30 天一個數據點
+      'all': {days: 1000, stepDays: 60} // 'all' 設為 2 年，每 30 天一個數據點    
     };
 
     const { days, stepDays } = PERIOD_CONFIG[period];
@@ -275,7 +275,7 @@ export const ether_obol = {
     const url = `https://api.etherscan.io/v2/api?chainid=1&module=account&action=tokentx&address=${splitWallet}&startblock=0&endblock=99999999&sort=desc&apikey=${EtherscanAPIKey}`;
 
     const transactions = await fetch(url).then(res => res.json()).then(data => data.result);
-    const tokenTx = transactions.find(tx => tx.input.startsWith("0xe4fc6b6  d"));
+    const tokenTx = transactions.find(tx => tx.input.startsWith("0xe4fc6b6d"));
     return tokenTx;
   },
 
