@@ -1005,10 +1005,12 @@ export default {
 
 .distribution-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 24px;
   padding-left: 12px;
   padding-right: 12px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .distribution-card {
@@ -1087,11 +1089,13 @@ export default {
   display: flex;
   gap: 16px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .stat-item {
   flex: 1;
   text-align: center;
+  min-width: 80px;
 }
 
 .stat-label {
@@ -1120,6 +1124,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .detail-row {
@@ -1127,6 +1132,8 @@ export default {
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .detail-label {
@@ -1219,14 +1226,25 @@ export default {
 }
 
 /* Responsive Design */
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
   .overview-section {
     gap: 20px;
   }
   
   .distribution-grid {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 20px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .overview-section {
+    gap: 18px;
+  }
+  
+  .distribution-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
   }
 }
 
@@ -1242,7 +1260,7 @@ export default {
   }
   
   .distribution-grid {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 16px;
   }
 }
@@ -1305,23 +1323,167 @@ export default {
   }
   
   .distribution-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 12px;
     padding-left: 0;
     padding-right: 0;
   }
   
-
+  .distribution-card {
+    min-height: 200px;
+  }
+  
+  .validator-stats {
+    gap: 12px;
+  }
+  
+  .stat-value {
+    font-size: 20px;
+  }
+  
+  .distribution-card .card-title {
+    font-size: 14px;
+  }
+  
+  .distribution-card .operator-number {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   .distribution-grid {
+    grid-template-columns: 1fr;
     gap: 10px;
   }
   
   .distribution-card {
     padding: 16px;
     min-height: 200px;
+  }
+  
+  .overview-card {
+    padding: 16px 12px;
+  }
+  
+  .overview-card .main-amount {
+    font-size: 28px;
+  }
+  
+  .distribution-header {
+    gap: 8px;
+  }
+  
+  .filter-tabs {
+    gap: 4px;
+  }
+  
+  .filter-tab {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+  
+  .validator-stats {
+    gap: 8px;
+  }
+  
+  .stat-value {
+    font-size: 18px;
+  }
+  
+  .stat-label {
+    font-size: 11px;
+  }
+  
+  .distribution-card .card-title {
+    font-size: 13px;
+  }
+  
+  .distribution-card .operator-number {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+  }
+  
+  .detail-row {
+    font-size: 11px;
+  }
+  
+  .validator-badge,
+  .deposited-badge,
+  .address-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .distribution-grid {
+    gap: 8px;
+  }
+  
+  .distribution-card {
+    padding: 12px;
+    min-height: 180px;
+  }
+  
+  .overview-card {
+    padding: 12px 10px;
+  }
+  
+  .overview-card .main-amount {
+    font-size: 24px;
+  }
+  
+  .distribution-header {
+    gap: 6px;
+  }
+  
+  .filter-tabs {
+    gap: 3px;
+  }
+  
+  .filter-tab {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+  
+  .validator-stats {
+    gap: 6px;
+  }
+  
+  .stat-value {
+    font-size: 16px;
+  }
+  
+  .stat-label {
+    font-size: 10px;
+  }
+  
+  .distribution-card .card-title {
+    font-size: 12px;
+  }
+  
+  .distribution-card .operator-number {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+  
+  .detail-row {
+    font-size: 10px;
+  }
+  
+  .validator-badge,
+  .deposited-badge,
+  .address-badge {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+  
+  .distribution-card .card-title-section {
+    gap: 6px;
   }
 }
 </style> 
