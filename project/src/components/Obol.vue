@@ -159,30 +159,18 @@
                 <div class="stat-label">Exited Validators</div>
                 <div class="stat-value exited">{{ cluster.totalExitedValidators }}</div>
               </div>
+              <div class="stat-item">
+                <div class="stat-label">Total Validators</div>
+                <div class="stat-value total">{{ cluster.totalAddedValidators }}</div>
+              </div>
             </div>
             
-            <div class="card-details">
-              <div class="detail-row">
-                <div class="detail-label">Total:</div>
-                <div class="validator-badge">
-                  {{ cluster.totalAddedValidators }}
-                </div>
-              </div>
-              
-              <div class="detail-row">
-                <div class="detail-label">Active:</div>
-                <div class="deposited-badge">
-                  {{ cluster.totalDepositedValidators }}
-                </div>
-              </div>
-              
-              <div class="detail-row">
-                <div class="detail-label">Address:</div>
-                <div class="address-badge" 
-                     @click.stop="copyToClipboard(cluster.rewardAddress)" 
-                     :title="cluster.rewardAddress">
-                  {{ formatAddress(cluster.rewardAddress) }}
-                </div>
+            <div class="reward-address-section">
+              <div class="address-label">Reward Address</div>
+              <div class="address-value" 
+                   @click.stop="copyToClipboard(cluster.rewardAddress)" 
+                   :title="cluster.rewardAddress">
+                {{ cluster.rewardAddress }}
               </div>
             </div>
           </div>
@@ -1005,10 +993,10 @@ export default {
 
 .distribution-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 24px;
-  padding-left: 12px;
-  padding-right: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 16px;
+  padding-left: 4px;
+  padding-right: 4px;
   width: 100%;
   max-width: 100%;
 }
@@ -1018,12 +1006,12 @@ export default {
   border: 1.5px solid rgba(0, 0, 0, 0.12);
   border-radius: var(--border-radius);
   box-shadow: 0 6px 24px rgba(59, 130, 246, 0.10), 0 1.5px 6px rgba(0,0,0,0.08);
-  padding: 24px 20px;
+  padding: 28px 24px;
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
   position: relative;
-  min-height: 220px;
+  min-height: 240px;
   cursor: pointer;
   overflow: hidden;
 }
@@ -1087,9 +1075,10 @@ export default {
 
 .validator-stats {
   display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 20px;
+  margin-bottom: 0;
   flex-wrap: wrap;
+  justify-content: space-between;
 }
 
 .stat-item {
@@ -1118,40 +1107,73 @@ export default {
   color: var(--text-muted);
 }
 
-/* 移除舊的錯誤樣式，因為現在使用遮罩 */
-
-.card-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.detail-label {
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.validator-badge,
-.deposited-badge,
-.address-badge {
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 11px;
+.stat-value.total {
+  color: var(--text-primary);
   font-weight: 600;
-  background: rgba(99, 102, 241, 0.1);
-  color: var(--brand-secondary);
-  border: 1px solid rgba(99, 102, 241, 0.2);
 }
+
+.reward-address-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.address-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.address-value {
+  font-size: 10px;
+  color: var(--text-primary);
+  font-weight: 500;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+  letter-spacing: 0.3px;
+  word-break: break-all;
+  line-height: 1.4;
+  position: relative;
+  overflow: hidden;
+}
+
+.address-value::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(99, 102, 241, 0.3) 50%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.address-value:hover::before {
+  opacity: 1;
+}
+
+.address-value:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(59, 130, 246, 0.12) 100%);
+  border-color: rgba(99, 102, 241, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
+}
+
+.address-value:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.1);
+}
+
+/* 移除舊的錯誤樣式，因為現在使用遮罩 */
 
 /* 連線逾時遮罩樣式 */
 .connection-timeout-overlay {
@@ -1207,14 +1229,7 @@ export default {
   border-color: rgba(0, 0, 0, 0.12);
 }
 
-.address-badge {
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
 
-.address-badge:hover {
-  background: rgba(99, 102, 241, 0.2);
-}
 
 
 
@@ -1232,8 +1247,8 @@ export default {
   }
   
   .distribution-grid {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
   }
 }
 
@@ -1243,8 +1258,8 @@ export default {
   }
   
   .distribution-grid {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 14px;
   }
 }
 
@@ -1260,8 +1275,8 @@ export default {
   }
   
   .distribution-grid {
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
   }
 }
 
@@ -1323,22 +1338,37 @@ export default {
   }
   
   .distribution-grid {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
     padding-left: 0;
     padding-right: 0;
   }
   
   .distribution-card {
     min-height: 200px;
+    padding: 24px 20px;
   }
   
   .validator-stats {
-    gap: 12px;
+    gap: 16px;
+  }
+  
+  .stat-item {
+    min-width: 70px;
   }
   
   .stat-value {
     font-size: 20px;
+  }
+  
+  .reward-address-section {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+  
+  .address-value {
+    font-size: 9px;
+    padding: 6px 10px;
   }
   
   .distribution-card .card-title {
@@ -1359,7 +1389,7 @@ export default {
   }
   
   .distribution-card {
-    padding: 16px;
+    padding: 20px 16px;
     min-height: 200px;
   }
   
@@ -1388,8 +1418,26 @@ export default {
     gap: 8px;
   }
   
+  .stat-item {
+    min-width: 60px;
+  }
+  
   .stat-value {
     font-size: 18px;
+  }
+  
+  .reward-address-section {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+  
+  .address-label {
+    font-size: 9px;
+  }
+  
+  .address-value {
+    font-size: 8px;
+    padding: 4px 8px;
   }
   
   .stat-label {
@@ -1406,16 +1454,7 @@ export default {
     font-size: 11px;
   }
   
-  .detail-row {
-    font-size: 11px;
-  }
-  
-  .validator-badge,
-  .deposited-badge,
-  .address-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-  }
+
 }
 
 @media (max-width: 480px) {
@@ -1424,7 +1463,7 @@ export default {
   }
   
   .distribution-card {
-    padding: 12px;
+    padding: 16px 12px;
     min-height: 180px;
   }
   
@@ -1453,8 +1492,26 @@ export default {
     gap: 6px;
   }
   
+  .stat-item {
+    min-width: 50px;
+  }
+  
   .stat-value {
     font-size: 16px;
+  }
+  
+  .reward-address-section {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+  
+  .address-label {
+    font-size: 8px;
+  }
+  
+  .address-value {
+    font-size: 7px;
+    padding: 3px 6px;
   }
   
   .stat-label {
@@ -1471,16 +1528,7 @@ export default {
     font-size: 10px;
   }
   
-  .detail-row {
-    font-size: 10px;
-  }
-  
-  .validator-badge,
-  .deposited-badge,
-  .address-badge {
-    font-size: 9px;
-    padding: 1px 4px;
-  }
+
   
   .distribution-card .card-title-section {
     gap: 6px;

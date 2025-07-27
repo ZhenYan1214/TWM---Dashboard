@@ -3,32 +3,30 @@
     
     <!-- 實際頁面內容 -->
     <div class="page-content">
-    <!-- Top Overview Section -->
-    <section class="overview-section">
-      <div class="operator-header-card">
-        <div class="operator-header-content">
-          <div class="operator-icon">
-            <span class="operator-number">#{{ operatorId }}</span>
-          </div>
-          <div class="operator-info">
-            <h2 class="operator-name">{{ operatorName }}</h2>
-            <div class="operator-subtitle">
-              <span class="operator-id">Operator ID: #{{ operatorId }}</span>
-              <div class="status-badge" :class="operatorInfo.status">
-                <span class="status-dot"></span>
-                <span class="status-text">{{ operatorInfo.statusText }}</span>
-              </div>
+    <!-- Operator Header Card -->
+    <div class="operator-header-card">
+      <div class="operator-header-content">
+        <div class="operator-icon">
+          <span class="operator-number">#{{ operatorId }}</span>
+        </div>
+        <div class="operator-info">
+          <h2 class="operator-name">{{ operatorName }}</h2>
+          <div class="operator-subtitle">
+            <span class="operator-id">Operator ID: #{{ operatorId }}</span>
+            <div class="status-badge" :class="operatorInfo.status">
+              <span class="status-dot"></span>
+              <span class="status-text">{{ operatorInfo.statusText }}</span>
             </div>
           </div>
-          <button @click="goBack" class="back-button">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-            返回
-          </button>
         </div>
+        <button @click="goBack" class="back-button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          返回
+        </button>
       </div>
-    </section>
+    </div>
 
     <!-- Statistics Overview Cards -->
     <section class="stats-overview-section">
@@ -1472,18 +1470,16 @@ export default {
 
 
 
-/* Top Overview Section */
-.overview-section {
-  padding: 32px 24px;
-}
-
+/* Operator Header Card */
 .operator-header-card {
   background: var(--bg-card);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-sm);
-  padding: 24px;
+  padding: 32px 24px;
   margin-bottom: 32px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .operator-header-content {
@@ -1560,6 +1556,8 @@ export default {
   gap: 24px;
   margin-bottom: 32px;
   padding: 0 24px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .overview-card {
@@ -2822,6 +2820,10 @@ export default {
     gap: 16px;
   }
   
+  .operator-header-card {
+    padding: 24px 20px;
+  }
+  
   .operator-header-content {
     flex-direction: column;
     align-items: flex-start;
@@ -2861,6 +2863,10 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .operator-header-card {
+    padding: 20px 16px;
+  }
+  
   .overview-card {
     padding: 20px 16px;
   }
@@ -2988,7 +2994,7 @@ export default {
 }
 
 @media (max-width: 600px) {
-  .overview-section,
+  .operator-header-card,
   .stats-overview-section,
   .contract-address-section,
   .split-wallet-section,
@@ -3094,6 +3100,10 @@ export default {
     font-size: 20px;
   }
   
+  .operator-header-card {
+    padding: 16px 12px;
+  }
+  
   .overview-card {
     padding: 16px 12px;
   }
@@ -3104,7 +3114,7 @@ export default {
 }
 
 @media (max-width: 480px) {
-  .overview-section,
+  .operator-header-card,
   .stats-overview-section,
   .contract-address-section,
   .split-wallet-section,
@@ -3208,6 +3218,10 @@ export default {
   
   .operator-name {
     font-size: 18px;
+  }
+  
+  .operator-header-card {
+    padding: 12px 8px;
   }
   
   .overview-card {
