@@ -1012,6 +1012,7 @@ export default {
   transition: all 0.3s ease;
   position: relative;
   min-height: 240px;
+  max-width: 360px;
   cursor: pointer;
   overflow: hidden;
 }
@@ -1042,7 +1043,8 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
 }
 
 .distribution-card .card-title-section {
@@ -1075,28 +1077,37 @@ export default {
 
 .validator-stats {
   display: flex;
-  gap: 20px;
+  gap: 16px;
   margin-bottom: 0;
   flex-wrap: wrap;
   justify-content: space-between;
+  flex: 1;
 }
 
 .stat-item {
   flex: 1;
   text-align: center;
-  min-width: 80px;
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1;
+  text-align: center;
 }
 
 .stat-value.active {
@@ -1116,6 +1127,7 @@ export default {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
 }
 
 .address-label {
@@ -1125,24 +1137,26 @@ export default {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-align: left;
 }
 
 .address-value {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-primary);
   font-weight: 500;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%);
   border: 1px solid rgba(99, 102, 241, 0.15);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   word-break: break-all;
-  line-height: 1.4;
+  line-height: 1.3;
   position: relative;
   overflow: hidden;
+  text-align: left;
 }
 
 .address-value::before {
@@ -1354,7 +1368,8 @@ export default {
   }
   
   .stat-item {
-    min-width: 70px;
+    min-width: 80px;
+    align-items: center;
   }
   
   .stat-value {
@@ -1419,7 +1434,8 @@ export default {
   }
   
   .stat-item {
-    min-width: 60px;
+    min-width: 70px;
+    align-items: center;
   }
   
   .stat-value {
@@ -1493,7 +1509,8 @@ export default {
   }
   
   .stat-item {
-    min-width: 50px;
+    min-width: 60px;
+    align-items: center;
   }
   
   .stat-value {
