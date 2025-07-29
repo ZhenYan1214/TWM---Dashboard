@@ -196,11 +196,11 @@ func main() {
 				}
 			}
 		}
-		// 欄位順序: type,node_id,delegator_id,amount,epoch_counter,timestamp,delegator_total,node_total,node_staked,delegator_staked
-		csv := "\uFEFFtype,node_id,delegator_id,amount,epoch_counter,timestamp,delegator_total,node_total,node_staked,delegator_staked\n" // UTF-8 BOM
+		// 欄位順序: type,node_id,delegator_id,本週Reward,epoch_counter,timestamp,delegator_total,node_total,node_staked,delegator_staked
+		csv := "\uFEFFtype,node_id,delegator_id,本週Reward,epoch_counter,timestamp,delegator_total,node_total,node_staked,delegator_staked\n" // UTF-8 BOM
 		for _, row := range rewards {
 			csv += "\"" + row.Type + "\"," +
-				"\"TWM\"," +
+				"\"FSD\"," +
 				"\"" + strconv.Itoa(row.DelegatorID) + "\"," +
 				formatAmount(row.Amount) + "," +
 				strconv.FormatUint(row.EpochCounter, 10) + "," +
