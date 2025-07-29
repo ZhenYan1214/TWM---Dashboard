@@ -344,6 +344,8 @@ export default {
       });
       return arr;
     },
+
+
     filteredDelegatorTotals() {
       // 只顯示被選中的 delegator
       return this.allDelegatorTotals.filter(card => this.selectedDelegators.includes(card.delegatorId));
