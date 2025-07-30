@@ -84,7 +84,7 @@ const processChartBatches = async (items, batchProcessor) => {
   
   return results;
 };
-  
+
 export const ether_obol = {
   getObolOperatorClustersRegistry: async () => {
     try {

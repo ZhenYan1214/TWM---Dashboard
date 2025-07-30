@@ -4,29 +4,29 @@
     <!-- 實際頁面內容 -->
     <div class="page-content">
     <!-- Operator Header Card -->
-    <div class="operator-header-card">
-      <div class="operator-header-content">
-        <div class="operator-icon">
-          <span class="operator-number">#{{ operatorId }}</span>
-        </div>
-        <div class="operator-info">
-          <h2 class="operator-name">{{ operatorName }}</h2>
-          <div class="operator-subtitle">
+      <div class="operator-header-card">
+        <div class="operator-header-content">
+          <div class="operator-icon">
+            <span class="operator-number">#{{ operatorId }}</span>
+          </div>
+          <div class="operator-info">
+            <h2 class="operator-name">{{ operatorName }}</h2>
+            <div class="operator-subtitle">
             <span class="operator-id">Operator ID: #{{ operatorId }}</span>
-            <div class="status-badge" :class="operatorInfo.status">
-              <span class="status-dot"></span>
-              <span class="status-text">{{ operatorInfo.statusText }}</span>
+              <div class="status-badge" :class="operatorInfo.status">
+                <span class="status-dot"></span>
+                <span class="status-text">{{ operatorInfo.statusText }}</span>
+              </div>
             </div>
           </div>
+          <button @click="goBack" class="back-button">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            返回
+          </button>
         </div>
-        <button @click="goBack" class="back-button">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          返回
-        </button>
       </div>
-    </div>
 
     <!-- Statistics Overview Cards -->
     <section class="stats-overview-section">
@@ -67,13 +67,16 @@
             </p>
             <p class="address-description" v-else>暫無地址</p>
           </div>
-          <div class="etherscan-badge" @click="openEtherscan(operatorInfo.rewardAddress)" v-if="operatorInfo.rewardAddress">
+          <div class="address-badges" v-if="operatorInfo.rewardAddress">
+            <div class="etherscan-badge" @click="openEtherscan(operatorInfo.rewardAddress)" title="在 Etherscan 中查看">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
               <polyline points="15,3 21,3 21,9"/>
               <line x1="10" y1="14" x2="21" y2="3"/>
             </svg>
-            查看
+              Etherscan
+            </div>
+            
           </div>
         </div>
       </div>
@@ -104,13 +107,23 @@
             </p>
             <p class="address-description" v-else>暫無地址</p>
           </div>
-          <div class="etherscan-badge" @click="openEtherscan(splitWalletAddress)" v-if="splitWalletAddress">
+          <div class="address-badges" v-if="splitWalletAddress">
+            <div class="etherscan-badge" @click="openEtherscan(splitWalletAddress)" title="在 Etherscan 中查看">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
               <polyline points="15,3 21,3 21,9"/>
               <line x1="10" y1="14" x2="21" y2="3"/>
             </svg>
-            查看
+              Etherscan
+            </div>
+            <div class="split-badge" @click="openSplitOrg(splitWalletAddress)" title="在 Splits.org 中查看">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+                <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+                <path d="M18 12a2 2 0 0 0 0 4h4v-4h-4z"/>
+              </svg>
+              Splits
+            </div>
           </div>
           <div class="loading-badge" v-else-if="splitWalletLoading">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -162,7 +175,7 @@
           <div class="list-header">
             <span class="header-title">獎勵地址分潤配置</span>
             <div class="header-info">
-              <span class="header-count">{{ rewardShareData.rewardAddress.length }} 個地址</span>
+            <span class="header-count">{{ rewardShareData.rewardAddress.length }} 個地址</span>
               <span v-if="claimableRewardsLoading" class="header-status loading">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 2l-2 2m-7.61 2.61L18 12l-2.39 7.39L12 18l-7.39 2.39L6 18l-6-6 6-1.39L8.61 6.61"/>
@@ -183,22 +196,37 @@
                  :key="index" 
                  class="share-item">
               <div class="share-main-info">
-                <div class="share-address-info">
-                  <div class="address-label">地址 {{ index + 1 }}</div>
-                  <div class="address-value" @click="openEtherscan(address)" title="點擊在 Etherscan 中查看">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                      <polyline points="15,3 21,3 21,9"/>
-                      <line x1="10" y1="14" x2="21" y2="3"/>
-                    </svg>
-                    {{ address }}
-                  </div>
+                             <div class="share-address-info">
+                 <div class="address-label">地址 {{ index + 1 }}</div>
+                  <div class="address-value">
+                    <div class="address-text">
+                      {{ address }}
+                    </div>
+                    <div class="address-links">
+                      <div class="address-link etherscan-link" @click="openEtherscan(address)" title="在 Etherscan 中查看">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                     <polyline points="15,3 21,3 21,9"/>
+                     <line x1="10" y1="14" x2="21" y2="3"/>
+                   </svg>
+                        <span class="link-text">Etherscan</span>
+                      </div>
+                      <div class="address-link split-link" @click="openSplitOrg(address)" title="在 Splits.org 中查看">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+                          <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+                          <path d="M18 12a2 2 0 0 0 0 4h4v-4h-4z"/>
+                        </svg>
+                        <span class="link-text">Splits</span>
+                      </div>
+                    </div>
+                 </div>
+               </div>
+              <div class="share-percentage">
+                <div class="percentage-label">分潤比例</div>
+                <div class="percentage-value">
+                  {{ calculateSharePercentage(rewardShareData.rewardShare[index]) }}
                 </div>
-                <div class="share-percentage">
-                  <div class="percentage-label">分潤比例</div>
-                  <div class="percentage-value">
-                    {{ calculateSharePercentage(rewardShareData.rewardShare[index]) }}
-                  </div>
                 </div>
                 <!-- 可領餘額區域 - 放在分潤比例右邊 -->
                 <div class="claimable-reward-section">
@@ -738,6 +766,14 @@ export default {
       
       const etherscanUrl = `https://etherscan.io/tx/${txHash}`
       window.open(etherscanUrl, '_blank')
+    },
+
+    // 跳轉到 Splits.org
+    openSplitOrg(address) {
+      if (!address) return
+      
+      const splitOrgUrl = `https://app.splits.org/accounts/${address}/`
+      window.open(splitOrgUrl, '_blank')
     },
 
 
@@ -1729,13 +1765,19 @@ export default {
   word-break: break-all;
 }
 
+.address-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .etherscan-badge {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
+  gap: 6px;
+  padding: 8px 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   background: rgba(59, 130, 246, 0.1);
   color: var(--brand-primary);
@@ -1746,6 +1788,26 @@ export default {
 
 .etherscan-badge:hover {
   background: rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
+}
+
+.split-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--brand-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.split-badge:hover {
+  background: rgba(99, 102, 241, 0.2);
   transform: translateY(-1px);
 }
 
@@ -2027,20 +2089,73 @@ export default {
 .address-value {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  word-break: break-all;
-  line-height: 1.4;
+  gap: 12px;
+  flex-wrap: nowrap;
+  width: 100%;
 }
 
-.address-value:hover {
+.address-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 340px;
+  color: var(--text-primary);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.address-links {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.address-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-width: 80px;
+}
+
+.address-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.link-text {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.etherscan-link {
+  background: rgba(59, 130, 246, 0.15);
   color: var(--brand-primary);
-  text-decoration: underline;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.etherscan-link:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.split-link {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--brand-secondary);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.split-link:hover {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.4);
 }
 
 .share-percentage {
@@ -2920,6 +3035,22 @@ export default {
     gap: 12px;
   }
   
+  .address-value {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .address-links {
+    align-self: flex-start;
+    flex-direction: row;
+    gap: 8px;
+  }
+  
+  .address-text {
+    padding-top: 0;
+  }
+  
   .share-percentage {
     text-align: left;
     min-width: auto;
@@ -2951,6 +3082,17 @@ export default {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+  
+  .address-badges {
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .etherscan-badge,
+  .split-badge {
+    padding: 6px 10px;
+    font-size: 12px;
   }
 
   .chart-header {
@@ -3052,6 +3194,15 @@ export default {
   .address-value {
     font-size: 11px;
     flex-wrap: wrap;
+  }
+  
+  .address-link {
+    padding: 4px 8px;
+    min-width: 70px;
+  }
+  
+  .link-text {
+    font-size: 11px;
   }
   
   .share-address-info {
