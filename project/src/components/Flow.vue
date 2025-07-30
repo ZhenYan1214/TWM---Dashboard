@@ -2,7 +2,7 @@
   <div class="flow-dashboard">
     <!-- Top Overview Cards -->
     <div class="overview-title-block overview-title-flex">
-      <span class="overview-title-text">總 Reward 變動</span>
+      <span class="overview-title-text">可提領餘額</span>
       <div class="delegator-filter-popwrap" @click.stop>
         <button class="delegator-filter-btn-pro" @click="showOverviewFilter = !showOverviewFilter">
           <svg class="filter-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
@@ -385,7 +385,7 @@ export default {
 
     if (thisWeekNode) {
       delegatorTotals.push({
-        label: `Node 總獎勵`,
+        label: `Node `,
         amount: thisWeekNode.node_total,
         change: lastWeekNode ? (thisWeekNode.node_total - lastWeekNode.node_total) : 0,
         delegatorId: -1,
@@ -395,7 +395,7 @@ export default {
     thisWeekDelegators.forEach(now => {
       const last = lastWeekDelegators.find(lw => lw.delegator_id === now.delegator_id);
       delegatorTotals.push({
-        label: `Delegator #${now.delegator_id} 總獎勵`,
+        label: `Delegator #${now.delegator_id} `,
         amount: now.delegator_total,
         change: last ? (now.delegator_total - last.delegator_total) : 0,
         delegatorId: now.delegator_id,

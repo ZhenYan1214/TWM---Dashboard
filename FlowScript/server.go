@@ -196,8 +196,8 @@ func main() {
 				}
 			}
 		}
-		// 欄位順序: type,node_id,delegator_id,本週Reward,epoch_counter,timestamp,delegator_total,node_total,node_staked,delegator_staked
-		csv := "\uFEFFtype,node_id,delegator_id,本週Reward,epoch_counter,timestamp,delegator_total,node_total,node_staked,delegator_staked\n" // UTF-8 BOM
+		// 欄位順序: type,node_id,delegator_id,本週Reward,epoch,timestamp,delegator 可提領餘額,node 可提領餘額,node 質押數量,delegator 質押數量
+		csv := "\uFEFFtype,node_id,delegator_id,本週 Reward,epoch,timestamp,delegator 可提領餘額,node 可提領餘額,node 質押數量,delegator 質押數量\n" // UTF-8 BOM
 		for _, row := range rewards {
 			csv += "\"" + row.Type + "\"," +
 				"\"FSD\"," +
