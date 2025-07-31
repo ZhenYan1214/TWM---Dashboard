@@ -173,7 +173,7 @@
             <tr v-for="(row, idx) in displayedLog" :key="row._logKey" :style="logFadeStyle(idx)">
               <td>{{ row.timestamp.split('T')[0] }}</td>
               <td>{{ row.type==='Node' ? 'Node' : ('Delegator #' + row.delegator_id) }}</td>
-              <td :class="{'log-amount-pos': row.amount>0, 'log-amount-neg': row.amount<0, 'log-amount-zero': row.amount===0}" >{{ row.amount>0?'+':'' }}{{ formatAmount(row.amount) }}</td>
+              <td :class="{'log-amount-pos': row.amount>0, 'log-amount-neg': row.amount<0, 'log-amount-zero': row.amount===0}" >{{ formatAmount(row.amount) }}</td>
               <td>{{ row.epoch_counter }}</td>
             </tr>
           </transition-group>
