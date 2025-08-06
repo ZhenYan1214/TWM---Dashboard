@@ -141,7 +141,7 @@ func (d *Database) GetAllRewards() ([]RewardData, error) {
 	query := `
 	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked
 	FROM rewards
-	ORDER BY timestamp DESC
+	ORDER BY timestamp DESC, delegator_id ASC
 	`
 
 	rows, err := d.db.Query(query)
@@ -180,7 +180,7 @@ func (d *Database) GetRewardsByType(rewardType string) ([]RewardData, error) {
 	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked
 	FROM rewards
 	WHERE type = ?
-	ORDER BY timestamp DESC
+	ORDER BY timestamp DESC, delegator_id ASC
 	`
 
 	rows, err := d.db.Query(query, rewardType)
@@ -219,7 +219,7 @@ func (d *Database) GetRewardsByDelegator(delegatorID int) ([]RewardData, error) 
 	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked
 	FROM rewards
 	WHERE delegator_id = ?
-	ORDER BY timestamp DESC
+	ORDER BY timestamp DESC, delegator_id ASC
 	`
 
 	rows, err := d.db.Query(query, delegatorID)
@@ -355,7 +355,7 @@ func (d *Database) GetRewardsByDateRange(start, end string) ([]RewardData, error
 	SELECT type, node_id, delegator_id, amount, epoch_counter, timestamp, delegator_total, node_total, node_staked, delegator_staked
 	FROM rewards
 	WHERE timestamp >= ? AND timestamp <= ?
-	ORDER BY timestamp DESC
+	ORDER BY timestamp DESC, delegator_id ASC
 	`
 	rows, err := d.db.Query(query, start+" 00:00:00", end+" 23:59:59")
 	if err != nil {
@@ -400,7 +400,7 @@ func (d *Database) GetRewardsByDelegators(ids []int) ([]RewardData, error) {
 	for i := range ids {
 		placeholders[i] = "?"
 	}
-	query += strings.Join(placeholders, ",") + ") ORDER BY timestamp DESC"
+	query += strings.Join(placeholders, ",") + ") ORDER BY timestamp DESC, delegator_id ASC"
 	rows, err := d.db.Query(query, params...)
 	if err != nil {
 		return nil, err
