@@ -2,15 +2,15 @@
   <div class="flow-dashboard">
     <!-- Top Overview Cards -->
     <div class="overview-title-block overview-title-flex">
-      <span class="overview-title-text">可提領餘額</span>
+      <span class="overview-title-text">Reward 概覽</span>
       <div class="delegator-filter-popwrap" @click.stop>
-        <button class="delegator-filter-btn-pro" @click="showOverviewFilter = !showOverviewFilter">
+        <button class="delegator-filter-btn-pro" @mouseenter="showOverviewFilter = true">
           <svg class="filter-icon" width="18" height="18" viewBox="0 0 20 20" fill="none">
             <path d="M3 5h14M6 9h8M9 13h2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
           </svg>
           FILTER
         </button>
-        <div v-if="showOverviewFilter" class="delegator-popover">
+        <div v-if="showOverviewFilter" class="delegator-popover" @mouseenter="showOverviewFilter = true" @mouseleave="showOverviewFilter = false">
           <div v-for="id in allDelegatorIdList" :key="id" class="delegator-pop-option"
                @click.stop="toggleDelegator(id)">
             <span class="delegator-pop-label">{{ id === -1 ? 'Node' : `Delegator${id}` }}</span>
@@ -43,13 +43,10 @@
             </div>
             <span class="overview-card-title">{{ card.label }}</span>
           </div>
-          <div class="change-badge" :class="{ 'positive': card.change > 0, 'negative': card.change < 0, 'neutral': card.change === 0 }">
-            <span class="change-amount">{{ formatChange(card.change) }}</span>
+          <div class="change-badge" :class="{ 'positive': card.change > 0, 'neutral': card.change === 0 }">
+            <span class="change-amount">{{ formatRewardAmount(card.change) }}</span>
             <svg v-if="card.change > 0" class="arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M7 14L12 9L17 14"/>
-            </svg>
-            <svg v-else-if="card.change < 0" class="arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M7 10L12 15L17 10"/>
             </svg>
           </div>
         </div>
@@ -74,78 +71,6 @@
 
     <!-- Divider -->
     <div class="divider"></div>
-
-    <!-- Bottom Distribution Cards -->
-    <section class="distribution-section">
-      <div class="distribution-title-block overview-title-flex">
-        <span class="distribution-title-text">本週 Reward 變動</span>
-      </div>
-      <div class="distribution-grid">
-        <div v-for="card in filteredDistributionCards" :key="card.id" class="distribution-card" @mouseenter="addCardHover" @mouseleave="removeCardHover">
-          <div class="card-header">
-            <div class="card-title-section">
-              <div class="card-icon">
-                <svg v-if="card.id === 'node'" width="28" height="28" viewBox="0 0 28 28" fill="none">
-                  <defs>
-                    <linearGradient id="star-blue" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stop-color="#7eb6ff"/>
-                      <stop offset="100%" stop-color="#b3aaff"/>
-                    </linearGradient>
-                  </defs>
-                  <path d="M14 3L17.09 10.26L25 11.27L19 17.14L20.18 25.02L14 21.77L7.82 25.02L9 17.14L3 11.27L10.91 10.26L14 3Z"
-                    stroke="url(#star-blue)" stroke-width="2.2" fill="none"/>
-                </svg>
-                <svg v-else width="42" height="42" viewBox="0 0 28 28" fill="none">
-                  <defs>
-                    <linearGradient id="check-blue" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stop-color="#7eb6ff"/>
-                      <stop offset="100%" stop-color="#b3aaff"/>
-                    </linearGradient>
-                  </defs>
-                  <circle cx="14" cy="14" r="12" fill="url(#check-blue)" opacity="0.13"/>
-                  <path d="M8 15L13 20L20 9" stroke="url(#check-blue)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>
-              <span class="card-title">{{ card.label }}</span>
-            </div>
-            <div class="change-indicator" :class="{ 'positive': card.change > 0, 'negative': card.change < 0, 'neutral': card.change === 0 }">
-              <span class="change-amount">{{ formatChange(card.change) }}</span>
-              <svg v-if="card.change > 0" class="arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M7 14L12 9L17 14"/>
-              </svg>
-              <svg v-else-if="card.change < 0" class="arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M7 10L12 15L17 10"/>
-              </svg>
-            </div>
-          </div>
-          
-          <div class="card-content">
-            <div class="main-amount">
-              {{ card.amount === 0 ? '—' : formatAmount(card.amount) }} <span class="unit">FLOW</span>
-            </div>
-            
-            <div class="card-details">
-              <div class="detail-row">
-                <div class="detail-label">DelegatorID:</div>
-                <div class="delegator-badge" :class="{ 'main-node': card.isMainNode }">
-                  {{ card.delegatorId }}
-                </div>
-              </div>
-              
-              <div class="detail-row">
-                <div class="detail-label">Epoch:</div>
-                <div class="epoch-badge">
-                  {{ card.epochCounter }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- 輪播按鈕已移除，超過四個自動換行 -->
-      </div>
-    </section>
-    <!-- Divider between distribution and summary -->
-    <div class="divider"></div>
     <!-- Summary Info Card -->
     <div class="summary-info-card reward-log-card">
       <div class="summary-title">
@@ -163,9 +88,9 @@
         <table class="reward-log-table">
           <thead>
             <tr>
-              <th @click="sortLog('timestamp')">Timestamp <span v-if="logSort==='timestamp'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
+              <th @click="sortLog('timestamp')">獎勵發放時間 <span v-if="logSort==='timestamp'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
               <th @click="sortLog('name')">ID <span v-if="logSort==='name'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
-              <th @click="sortLog('amount')">Reward <span v-if="logSort==='amount'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
+              <th @click="sortLog('amount')">本週Reward <span v-if="logSort==='amount'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
               <th @click="sortLog('epoch_counter')">Epoch <span v-if="logSort==='epoch_counter'">{{ logSortDir==='asc'?'▲':'▼' }}</span></th>
             </tr>
           </thead>
@@ -262,40 +187,7 @@ export default {
       ],
       selectedDelegators: [], // 多選篩選器
       allDelegatorIdList: [], // 所有可選 delegatorId
-      distributionCards: [ // 顯示本周新增內容
-        {
-          id: 'node',
-          label: 'Node',
-          amount: 0,
-          change: 123.88,
-          delegatorId: -1,
-          epochCounter: 0,
-        },
-        {
-          id: 'delegator2',
-          label: 'Delegator #2',
-          amount: 0,
-          change: 4.68,
-          delegatorId: 'DEL-002',
-          epochCounter: 0,
-        },
-        {
-          id: 'delegator3',
-          label: 'Delegator #3',
-          amount: 0,
-          change: -0.12,
-          delegatorId: 'DEL-003',
-          epochCounter: 0,
-        },
-        {
-          id: 'delegator4',
-          label: 'Delegator #4',
-          amount: 0,
-          change: 2.34,
-          delegatorId: 'DEL-004',
-          epochCounter: 0,
-        }
-      ],
+
       summaryStats: {
         thisWeekTotal: 0,
         lastWeekTotal: 0,
@@ -312,7 +204,6 @@ export default {
       weekOptions: [],
       logExpanded: false,
       showOverviewFilter: false,
-      showDistributionFilter: false,
     }
   },
   computed: {
@@ -350,10 +241,7 @@ export default {
       // 只顯示被選中的 delegator
       return this.allDelegatorTotals.filter(card => this.selectedDelegators.includes(card.delegatorId));
     },
-    filteredDistributionCards() {
-      // 只顯示被選中的 delegator
-      return this.distributionCards.filter(card => this.selectedDelegators.includes(card.delegatorId));
-    },
+
     displayedLog() {
       return this.logExpanded ? this.filteredLog : this.filteredLog.slice(0, 3);
     }
@@ -383,21 +271,20 @@ export default {
     const thisWeekNode = thisWeekData.find(item => item.type === 'Node');
     const lastWeekNode = lastWeekData.find(item => item.type === 'Node');
 
-    if (thisWeekNode) {
+    if (thisWeekNode) { //Node
       delegatorTotals.push({
         label: `Node `,
         amount: thisWeekNode.node_total,
-        change: lastWeekNode ? (thisWeekNode.node_total - lastWeekNode.node_total) : 0,
+        change: thisWeekNode.amount, // 本周reward
         delegatorId: -1,
         staked: thisWeekNode.node_staked
       });
     }
-    thisWeekDelegators.forEach(now => {
-      const last = lastWeekDelegators.find(lw => lw.delegator_id === now.delegator_id);
+    thisWeekDelegators.forEach(now => { //Delegator
       delegatorTotals.push({
         label: `Delegator #${now.delegator_id} `,
         amount: now.delegator_total,
-        change: last ? (now.delegator_total - last.delegator_total) : 0,
+        change: now.amount, // 本周reward金額
         delegatorId: now.delegator_id,
         staked: now.delegator_staked
       });
@@ -408,36 +295,7 @@ export default {
     // 預設只選 Node、Delegator2、Delegator3
     this.selectedDelegators = this.allDelegatorIdList.filter(id => id === -1 || id === 2 || id === 3);
 
-    // 3. 動態產生 distributionCards，支援所有 delegator（含 Node）
-    const distCards = [];
-    if (thisWeekNode) {
-      distCards.push({
-        id: 'node',
-        label: 'Node',
-        amount: thisWeekNode.amount,
-        change: lastWeekNode ? (thisWeekNode.amount - lastWeekNode.amount) : 0,
-        delegatorId: -1,
-        epochCounter: thisWeekNode.epoch_counter,
-      });
-    }
-    thisWeekDelegators.forEach(now => {
-      const last = lastWeekDelegators.find(lw => lw.delegator_id === now.delegator_id);
-      distCards.push({
-        id: `delegator${now.delegator_id}`,
-        label: `Delegator #${now.delegator_id}`,
-        amount: now.amount,
-        change: last ? (now.amount - last.amount) : 0,
-        delegatorId: now.delegator_id,
-        epochCounter: now.epoch_counter,
-      });
-    });
-    this.distributionCards = distCards;
-    // distributionCards 也要有 delegatorId 屬性（確保是數字）
-    this.distributionCards.forEach(card => {
-      if (typeof card.delegatorId === 'string' && card.delegatorId.startsWith('DEL-')) {
-        card.delegatorId = parseInt(card.delegatorId.replace('DEL-', ''));
-      }
-    });
+
 
     // 整理 rewardHistory
     const grouped = {};
@@ -487,14 +345,20 @@ export default {
       event.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
     },
     formatAmount(amount) {
+      // 完整顯示小數點，不限制位數
       return new Intl.NumberFormat('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 20
       }).format(amount);
     },
     formatChange(change) {
       const sign = change > 0 ? '+' : (change < 0 ? '' : '');
-      return `${sign}${change.toFixed(2)}`;
+      // 完整顯示小數點
+      return `${sign}${change.toString()}`;
+    },
+    formatRewardAmount(amount) {
+      // 專門用於可提領餘額卡片的 reward 金額顯示，完整顯示小數點
+      return `+${amount.toString()}`;
     },
     copyToClipboard(text) {
       navigator.clipboard.writeText(text).then(() => {
@@ -622,7 +486,7 @@ export default {
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  min-height: 90px;
+  min-height: 120px;
 }
 
 .overview-card::before {
@@ -668,12 +532,16 @@ export default {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   background: var(--change-badge-bg, rgba(16, 185, 129, 0.1));
   color: var(--change-badge-color, var(--success));
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .overview-card .change-badge.negative {
@@ -709,27 +577,27 @@ export default {
   margin-bottom: 12px;
 }
 
-.overview-card .main-amount,
-.distribution-card .main-amount {
+.overview-card .main-amount {
   padding-left: 14px;
   text-align: auto;
-  font-size: 36px;
+  font-size: 28px;
   font-weight: 950;
   color: var(--text-primary);
-  letter-spacing: 1.2px;
+  letter-spacing: 0.8px;
   text-shadow: 0 2px 12px rgba(126,182,255,0.08), 0 1px 2px rgba(179,170,255,0.06);
   transition: transform 0.18s cubic-bezier(.4,2,.6,1);
+  word-break: break-all;
+  line-height: 1.1;
 }
-.overview-card:hover .main-amount,
-.distribution-card:hover .main-amount {
+.overview-card:hover .main-amount {
   transform: scale(1.06);
 }
 
 .overview-card .unit {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--brand-primary);
-  margin-left: 0.8rem;
+  margin-left: 0.6rem;
   opacity: 1;
 }
 
@@ -817,251 +685,7 @@ export default {
   margin: 32px 0;
 }
 
-/* Distribution Section */
-.distribution-section {
-  flex: 1;
-  overflow: hidden;
-}
 
-.distribution-title {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--brand-primary);
-  margin-bottom: 18px;
-  margin-left: 4px;
-  letter-spacing: 1px;
-  line-height: 1.18;
-  text-shadow: 0 2px 8px rgba(126,182,255,0.08), 0 1px 2px rgba(179,170,255,0.06);
-  display: inline-block;
-  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.distribution-title-block {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  margin-bottom: 20px;
-}
-
-.distribution-title-icon {
-  color: var(--brand-primary);
-}
-
-.distribution-title-text {
-  font-size: 1.8rem;
-  font-weight: 900;
-  color: var(--brand-primary);
-  margin-left: 4px;
-  letter-spacing: 2px;
-  line-height: 1.13;
-  text-shadow: 0 4px 18px rgba(126,182,255,0.13), 0 1.5px 6px rgba(179,170,255,0.10);
-  display: inline-block;
-  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-transform: uppercase;
-  font-stretch: expanded;
-  filter: brightness(1.08) drop-shadow(0 2px 8px rgba(126,182,255,0.10));
-}
-
-/* 改為 grid，每行四個卡片，自動換行 */
-.distribution-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 32px 28px;
-  height: auto;
-  padding-left: 12px;
-  padding-right: 12px;
-}
-
-.distribution-card {
-  width: 100%;
-  min-width: 0;
-  background: var(--bg-card);
-  border: 1.5px solid rgba(0, 0, 0, 0.12);
-  border-radius: var(--border-radius);
-  box-shadow: 0 6px 24px rgba(59, 130, 246, 0.10), 0 1.5px 6px rgba(0,0,0,0.08);
-  padding: 26px 22px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: stretch;
-  transition: box-shadow 0.3s cubic-bezier(.4,2,.6,1), border 0.3s cubic-bezier(.4,2,.6,1);
-  position: relative;
-  overflow: visible;
-  min-height: 200px;
-  height: 200px;
-  max-width: 280px;
-  margin: 0 auto;
-}
-
-.distribution-card:hover {
-  transform: none;
-  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.16), 0 2px 8px rgba(0,0,0,0.10);
-}
-
-.distribution-card:not(:last-child) {
-  box-shadow: 0 6px 24px rgba(59, 130, 246, 0.10), 0 1.5px 6px rgba(0,0,0,0.08);
-  border-bottom: 2px solid rgba(99, 102, 241, 0.10);
-}
-
-.distribution-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--brand-secondary) 0%, var(--brand-primary) 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.distribution-card:hover::before {
-  opacity: 1;
-}
-
-.distribution-card .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 28px;
-}
-
-.distribution-card .card-title-section {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.distribution-card .card-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--brand-primary);
-}
-
-.distribution-card .card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.distribution-card .change-indicator {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--change-badge-bg, rgba(16, 185, 129, 0.1));
-  color: var(--change-badge-color, var(--success));
-}
-
-.distribution-card .change-indicator.negative {
-  background: var(--change-badge-bg-neg, rgba(239, 68, 68, 0.1));
-  color: var(--change-badge-color-neg, var(--danger));
-}
-
-.distribution-card .change-indicator.neutral {
-  background: var(--change-badge-bg-neutral, #f3f4f6);
-  color: var(--brand-primary);
-  font-style: normal;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  border: 1.5px solid var(--brand-primary);
-  box-shadow: none;
-}
-
-.distribution-card .card-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.distribution-card .main-amount {  
-  font-size: 32px;
-  font-weight: 900;
-  color: var(--text-primary);
-  line-height: 1.1;
-  margin-bottom: -12px;  
-  margin-top: 28px;
-  text-align: left;
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-}
-
-.distribution-card .unit {
-  margin-top: 12px;
-  font-size: 16px;
-  font-weight: 900;
-  color: var(--brand-primary);
-  margin-left: 0.8rem;
-  opacity: 1;
-}
-
-.distribution-card .card-details {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 36px;
-}
-
-.distribution-card .detail-row {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  font-size: 12px;
-  min-width: 80px;
-}
-
-.distribution-card .detail-label {
-  color: var(--text-muted);
-  font-weight: 600;
-  min-width: 70px;
-  margin-bottom: 2px;
-}
-
-.distribution-card .delegator-badge,
-.distribution-card .epoch-badge {
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  background: rgba(99, 102, 241, 0.1);
-  color: var(--brand-secondary);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  margin-bottom: 2px;
-  animation: change-breath 1.8s infinite cubic-bezier(.4,2,.6,1);
-}
-
-.distribution-card .delegator-badge.main-node {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  
-}
-
-.distribution-card .epoch-badge {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--brand-primary);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  
-}
 
 .arrow {
   animation: arrowMove 1.5s infinite alternate ease-in-out;
@@ -1077,8 +701,7 @@ export default {
   50% { filter: brightness(1.35); }
   100% { filter: brightness(1); }
 }
-.overview-card .change-badge .change-amount,
-.distribution-card .change-indicator .change-amount {
+.overview-card .change-badge .change-amount {
   animation: change-breath 1.8s infinite cubic-bezier(.4,2,.6,1);
 }
 
@@ -1088,15 +711,7 @@ export default {
     gap: 20px;
   }
   
-  .distribution-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
-  }
-  .distribution-card {
-    max-width: 100%;
-    height: 160px;
-    min-height: 140px;
-  }
+
 }
 
 @media (max-width: 1024px) {
@@ -1110,16 +725,10 @@ export default {
     padding: 24px 20px;
   }
   
-  .distribution-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-  }
+
   
-  .distribution-card {
-    min-height: 160px;
-  }
-  .overview-card .main-amount,
-  .distribution-card .main-amount {
+
+  .overview-card .main-amount {
     font-size: 32px;
   }
 }
@@ -1129,37 +738,16 @@ export default {
     padding: 20px 16px;
   }
   
-  .overview-card .main-amount,
-  .distribution-card .main-amount {
+  .overview-card .main-amount {
     font-size: 28px;
   }
-  .distribution-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    padding-left: 0;
-    padding-right: 0;
-  }
-  
-  .distribution-card {
-    max-width: 100%;
-    height: 140px;
-    min-height: 120px;
-  }
+
 }
 
 @media (max-width: 480px) {
-  .distribution-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
+
   
-  .distribution-card {
-    padding: 14px;
-    min-height: 120px;
-  }
-  
-  .overview-card .main-amount,
-  .distribution-card .main-amount {
+  .overview-card .main-amount {
     font-size: 24px;
   }
 }
@@ -1390,14 +978,23 @@ export default {
 .log-amount-pos {
   color: var(--success);
   font-weight: 700;
+  font-size: 13px;
+  word-break: break-all;
+  line-height: 1.3;
 }
 .log-amount-neg {
   color: var(--danger);
   font-weight: 700;
+  font-size: 13px;
+  word-break: break-all;
+  line-height: 1.3;
 }
 .log-amount-zero {
   color: #b0b4ba;
   font-weight: 600;
+  font-size: 13px;
+  word-break: break-all;
+  line-height: 1.3;
 }
 .log-hash {
   font-family: 'Fira Mono', 'Consolas', monospace;
@@ -1423,6 +1020,15 @@ export default {
     font-size: 14px;
     padding: 8px 6px;
   }
+  .overview-card .main-amount {
+    font-size: 24px;
+  }
+  .overview-card .unit {
+    font-size: 14px;
+  }
+  .staked-amount {
+    font-size: 14px;
+  }
 }
 @media (max-width: 600px) {
   .reward-log-card {
@@ -1436,6 +1042,19 @@ export default {
   .reward-log-table th, .reward-log-table td {
     font-size: 13px;
     padding: 6px 4px;
+  }
+  .overview-card .main-amount {
+    font-size: 20px;
+  }
+  .overview-card .unit {
+    font-size: 12px;
+  }
+  .staked-amount {
+    font-size: 12px;
+  }
+  .overview-card .change-badge {
+    font-size: 10px;
+    max-width: 100px;
   }
 }
 .log-expand-wrap {
@@ -1498,25 +1117,7 @@ export default {
   box-shadow: 0 4px 16px rgba(126,182,255,0.18);
   transform: translateY(-2px) scale(1.04);
 }
-.distribution-next-btn {
-  height: 48px;
-  min-width: 48px;
-  border-radius: 50%;
-  background: linear-gradient(90deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
-  color: #fff;
-  font-size: 20px;
-  font-weight: 700;
-  border: none;
-  margin-left: 16px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(126,182,255,0.10);
-  transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-}
-.distribution-next-btn:hover {
-  background: linear-gradient(90deg, var(--brand-secondary) 0%, var(--brand-primary) 100%);
-  box-shadow: 0 4px 16px rgba(126,182,255,0.18);
-  transform: translateY(-2px) scale(1.04);
-}
+
 .msb-wrap {
   position: relative;
   display: inline-block;
@@ -1718,8 +1319,10 @@ export default {
 .staked-amount {
   font-weight: 700;
   color: rgba(59,130,246,0.75);
-  font-size: 20px;
+  font-size: 16px;
   margin-left: 2px;
+  word-break: break-all;
+  line-height: 1.2;
 }
 /* CSS: 新增 divider 與 staked-row 專業樣式 */
 .overview-staked-divider {

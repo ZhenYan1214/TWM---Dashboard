@@ -196,19 +196,35 @@ func main() {
 				}
 			}
 		}
-		// 欄位順序: type,node_id,delegator_id,本週Reward,epoch,timestamp,delegator 可提領餘額,node 可提領餘額,node 質押數量,delegator 質押數量
-		csv := "\uFEFFtype,node_id,delegator_id,本週 Reward,epoch,timestamp,delegator 可提領餘額,node 可提領餘額,node 質押數量,delegator 質押數量\n" // UTF-8 BOM
+		// 欄位順序: 獎勵發放時間,type,delegator_id,node_ID,epoch,本周Reward,delegator 可提領餘額,node 可提領餘額,delegator 質押數量,node 質押數量
+		csv := "\uFEFF獎勵發放時間,type,delegator_id,node_ID,epoch,本周Reward,delegator 可提領餘額,node 可提領餘額,delegator 質押數量,node 質押數量\n" // UTF-8 BOM
 		for _, row := range rewards {
-			csv += "\"" + row.Type + "\"," +
-				"\"FSD\"," +
+			// 根據 delegator_id 決定 node 可提領餘額的值
+			var nodeTotalValue float64
+			if row.DelegatorID == -1 {
+				nodeTotalValue = row.NodeTotal
+			} else {
+				nodeTotalValue = 0
+			}
+
+			// 根據 delegator_id 決定 node 質押數量的值
+			var nodeStakedValue float64
+			if row.DelegatorID == -1 {
+				nodeStakedValue = row.NodeStaked
+			} else {
+				nodeStakedValue = 0
+			}
+
+			csv += "\"" + row.Timestamp.Format("2006-01-02 15:04:05") + "\"," +
+				"\"" + row.Type + "\"," +
 				"\"" + strconv.Itoa(row.DelegatorID) + "\"," +
-				formatAmount(row.Amount) + "," +
+				"\"FSD\"," +
 				strconv.FormatUint(row.EpochCounter, 10) + "," +
-				"\"" + row.Timestamp.Format("2006-01-02 15:04:05") + "\"," +
+				formatAmount(row.Amount) + "," +
 				formatAmount(row.DelegatorTotal) + "," +
-				formatAmount(row.NodeTotal) + "," +
-				formatAmount(row.NodeStaked) + "," +
-				formatAmount(row.DelegatorStaked) + "\n"
+				formatAmount(nodeTotalValue) + "," +
+				formatAmount(row.DelegatorStaked) + "," +
+				formatAmount(nodeStakedValue) + "\n"
 		}
 		c.Header("Content-Type", "text/csv; charset=utf-8")
 		c.Header("Content-Disposition", "attachment; filename=reward_log.csv")
@@ -237,7 +253,7 @@ func splitWeek(week string) []string {
 	return parts
 }
 
-// 工具函數：金額格式化
+// 工具函數：金額格式化 - 完整顯示小數點
 func formatAmount(amount float64) string {
-	return strconv.FormatFloat(amount, 'f', 2, 64)
+	return strconv.FormatFloat(amount, 'f', -1, 64)
 }
