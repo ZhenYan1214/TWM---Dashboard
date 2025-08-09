@@ -59,7 +59,31 @@
             </svg>
           </div>
           <div class="address-content">
-            <h3 class="address-title">Address</h3>
+            <div class="title-with-help">
+              <h3 class="address-title">ObolLidoSplit</h3>
+              <div class="info-help-icon"
+                   title="合約說明"
+                   @click="toggleInfo('showObolSplitInfo','obolInfoTimer')"
+                   @mouseenter="showInfo('showObolSplitInfo','obolInfoTimer')"
+                   @mouseleave="scheduleHideInfo('showObolSplitInfo','obolInfoTimer')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                  <circle cx="12" cy="17" r="0.5"/>
+                </svg>
+              </div>
+              <div v-if="showObolSplitInfo" class="info-tooltip"
+                   @mouseenter="showInfo('showObolSplitInfo','obolInfoTimer')"
+                   @mouseleave="scheduleHideInfo('showObolSplitInfo','obolInfoTimer')">
+                <div class="tooltip-header">
+                  <h4>ObolLidoSplit</h4>
+                  <button class="close-tooltip" @click="toggleInfo('showObolSplitInfo','obolInfoTimer')">×</button>
+                </div>
+                <div class="tooltip-content">
+                  將獎勵從 stETH 打包成 wstETH 並轉到 SplitWallet
+                </div>
+              </div>
+            </div>
             <p class="address-description contract-address" v-if="operatorInfo.rewardAddress" 
                @click="openEtherscan(operatorInfo.rewardAddress)" 
                title="點擊在 Etherscan 中查看">
@@ -97,7 +121,31 @@
             </svg>
           </div>
           <div class="address-content">
-            <h3 class="address-title">Split Wallet</h3>
+            <div class="title-with-help">
+              <h3 class="address-title">Split Wallet</h3>
+              <div class="info-help-icon"
+                   title="合約說明"
+                   @click="toggleInfo('showSplitWalletInfo','splitInfoTimer')"
+                   @mouseenter="showInfo('showSplitWalletInfo','splitInfoTimer')"
+                   @mouseleave="scheduleHideInfo('showSplitWalletInfo','splitInfoTimer')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                  <circle cx="12" cy="17" r="0.5"/>
+                </svg>
+              </div>
+              <div v-if="showSplitWalletInfo" class="info-tooltip"
+                   @mouseenter="showInfo('showSplitWalletInfo','splitInfoTimer')"
+                   @mouseleave="scheduleHideInfo('showSplitWalletInfo','splitInfoTimer')">
+                <div class="tooltip-header">
+                  <h4>SplitWallet</h4>
+                  <button class="close-tooltip" @click="toggleInfo('showSplitWalletInfo','splitInfoTimer')">×</button>
+                </div>
+                <div class="tooltip-content">
+                  收款用的中繼合約，定義分配比例
+                </div>
+              </div>
+            </div>
             <p class="address-description" v-if="splitWalletLoading">正在載入中...</p>
             <p class="address-description" v-else-if="splitWalletError">載入失敗</p>
             <p class="address-description split-wallet-address" v-else-if="splitWalletAddress" 
@@ -147,7 +195,38 @@
             </svg>
           </div>
           <div class="section-content">
-            <h3 class="section-title">Cluster 分潤配置</h3>
+            <div class="title-with-help">
+              <h3 class="section-title">Cluster 分潤配置</h3>
+              <div class="info-help-icon"
+                   title="說明"
+                   @click="toggleInfo('showRewardShareInfo','rewardInfoTimer')"
+                   @mouseenter="showInfo('showRewardShareInfo','rewardInfoTimer')"
+                   @mouseleave="scheduleHideInfo('showRewardShareInfo','rewardInfoTimer')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                  <circle cx="12" cy="17" r="0.5"/>
+                </svg>
+              </div>
+              <div v-if="showRewardShareInfo" class="info-tooltip"
+                   @mouseenter="showInfo('showRewardShareInfo','rewardInfoTimer')"
+                   @mouseleave="scheduleHideInfo('showRewardShareInfo','rewardInfoTimer')">
+                <div class="tooltip-header">
+                  <h4>分潤與可領餘額</h4>
+                  <button class="close-tooltip" @click="toggleInfo('showRewardShareInfo','rewardInfoTimer')">×</button>
+                </div>
+                <div class="tooltip-content simple-list">
+                  <div class="tooltip-item">
+                    <div class="item-title">分潤比例</div>
+                    <div class="item-desc">從 SplitWallet 的創建參數解析而來</div>
+                  </div>
+                  <div class="tooltip-item">
+                    <div class="item-title">可領餘額</div>
+                    <div class="item-desc">查詢地址在 SplitMain 中的全部可領餘額（可能包含其他 Cluster 獎勵）</div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <p class="section-description" v-if="rewardShareLoading">正在載入分潤資料...</p>
             <p class="section-description" v-else-if="rewardShareError">{{ rewardShareError }}</p>
             <p class="section-description" v-else-if="rewardShareData">
@@ -345,14 +424,45 @@
               </div>
               <div class="card-unit">wstETH</div>
             </div>
-            <div class="estimation-note" v-if="predictionError">
-              無法預估(沒有分潤紀錄)
+            
+            <!-- 問號圖標 - 右上角 -->
+            <div class="formula-help-icon" 
+                 @click="toggleFormulaTooltip" 
+                 @mouseenter="showTooltip" 
+                 @mouseleave="scheduleHideTooltip"
+                 title="查看收益預估公式">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <circle cx="12" cy="17" r="0.5"/>
+              </svg>
             </div>
-            <div class="estimation-note" v-else-if="predictedWstETH === null">
-              {{ getOperatorType() }} {{ lidoAPR ? '(APR: ' + (lidoAPR * 100).toFixed(2) + '%)' : '' }}
-            </div>
-            <div class="estimation-note" v-else>
-              基於 {{ getOperatorType() }} (APR: {{ (lidoAPR * 100).toFixed(2) }}%)
+            
+            <!-- 公式說明工具提示 -->
+            <div v-if="showFormulaTooltip" 
+                 class="formula-tooltip"
+                 @mouseenter="showTooltip"
+                 @mouseleave="scheduleHideTooltip">
+              <div class="tooltip-header">
+                <h4>收益預估公式</h4>
+                <button class="close-tooltip" @click="hideFormulaTooltip">×</button>
+              </div>
+              <div class="tooltip-content">
+                <div class="formula-section">
+                  <h5>基本公式</h5>
+                  <p class="formula-text">No_of_validator * ( 32 * Lido Protocol APR * Node operator share)</p>
+                </div>
+                <div class="formula-section">
+                  <h5>參數說明</h5>
+                  <ul class="formula-params">
+                    <li><strong>No_of_validator:</strong> Validator啟動數量</li>
+                    <li><strong>32:</strong> Validator質押的 ETH 數量</li>
+                    <li><strong>Lido Protocol APR:</strong> Lido年化報酬率</li>
+                    <li><strong>Node operator share:</strong> Node operator分潤比例</li>
+                  </ul>
+                </div>  
+                
+              </div>
             </div>
           </div>
         </div>
@@ -561,6 +671,16 @@ export default {
       lidoAPR: null,
       predictedWstETH: null,
       predictionError: null,
+      // 工具提示相關數據
+      showFormulaTooltip: false,
+      tooltipTimer: null,
+      // Info tooltips
+      showObolSplitInfo: false,
+      showSplitWalletInfo: false,
+      obolInfoTimer: null,
+      splitInfoTimer: null,
+      showRewardShareInfo: false,
+      rewardInfoTimer: null,
       // Chart 相關數據 - 重構為多圖表實例
       charts: {
         '1m': { data: null, loading: false, error: null, instance: null },
@@ -937,6 +1057,70 @@ export default {
     // 獲取操作者類型
     getOperatorType() {
       return this.operatorType || 'Obol'
+    },
+
+    // 工具提示相關方法
+    toggleFormulaTooltip() {
+      this.showFormulaTooltip = !this.showFormulaTooltip
+      if (this.tooltipTimer) {
+        clearTimeout(this.tooltipTimer)
+        this.tooltipTimer = null
+      }
+    },
+
+    showTooltip() {
+      if (this.tooltipTimer) {
+        clearTimeout(this.tooltipTimer)
+        this.tooltipTimer = null
+      }
+      this.showFormulaTooltip = true
+    },
+
+    hideFormulaTooltip() {
+      this.showFormulaTooltip = false
+      if (this.tooltipTimer) {
+        clearTimeout(this.tooltipTimer)
+        this.tooltipTimer = null
+      }
+    },
+
+    scheduleHideTooltip() {
+      if (this.tooltipTimer) {
+        clearTimeout(this.tooltipTimer)
+      }
+      this.tooltipTimer = setTimeout(() => {
+        this.showFormulaTooltip = false
+        this.tooltipTimer = null
+      }, 500)
+    },
+
+    hideFormulaTooltipDelayed() { /* legacy alias to keep backward compatibility */
+      this.scheduleHideTooltip()
+    },
+
+    // Generic info tooltip helpers for titles
+    toggleInfo(flagKey, timerKey) {
+      this[flagKey] = !this[flagKey]
+      if (this[timerKey]) {
+        clearTimeout(this[timerKey])
+        this[timerKey] = null
+      }
+    },
+    showInfo(flagKey, timerKey) {
+      if (this[timerKey]) {
+        clearTimeout(this[timerKey])
+        this[timerKey] = null
+      }
+      this[flagKey] = true
+    },
+    scheduleHideInfo(flagKey, timerKey) {
+      if (this[timerKey]) {
+        clearTimeout(this[timerKey])
+      }
+      this[timerKey] = setTimeout(() => {
+        this[flagKey] = false
+        this[timerKey] = null
+      }, 400)
     },
 
     // 獲取特定地址的可領餘額
@@ -1491,6 +1675,12 @@ export default {
     
     // 清理圖表實例
     this.destroyAllCharts()
+    
+    // 清理工具提示定時器
+    if (this.tooltipTimer) {
+      clearTimeout(this.tooltipTimer)
+      this.tooltipTimer = null
+    }
   }
 }
 </script>
@@ -1757,6 +1947,35 @@ export default {
   color: var(--text-primary);
   margin-bottom: 4px;
 }
+
+.title-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.info-help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: var(--brand-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.info-help-icon:hover { background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.35); }
+
+.info-tooltip::before { content: ''; position: absolute; top: 50%; left: -8px; transform: translateY(-50%); width: 0; height: 0; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-right: 8px solid var(--bg-card); }
+.info-tooltip::after { content: ''; position: absolute; top: 50%; left: -9px; transform: translateY(-50%); width: 0; height: 0; border-top: 9px solid transparent; border-bottom: 9px solid transparent; border-right: 9px solid var(--border-color, rgba(0,0,0,0.12)); }
+
+.info-tooltip { position: absolute; top: 50%; left: calc(100% + 10px); transform: translateY(-50%); background: var(--bg-card); border: 1px solid var(--border-color, rgba(0,0,0,0.12)); border-radius: 10px; box-shadow: 0 10px 26px rgba(0,0,0,0.18); min-width: 300px; max-width: 460px; z-index: 9999; animation: tooltipFadeIn 0.16s ease-out; }
+.info-tooltip .tooltip-content { padding: 12px 14px; font-size: 13px; line-height: 1.5; color: var(--text-primary); font-family: inherit; letter-spacing: 0.01em; }
 
 .address-description {
   color: var(--text-secondary);
@@ -2399,6 +2618,7 @@ export default {
 .stats-card.estimated-earnings {
   color: var(--brand-secondary);
   position: relative;
+  overflow: visible; /* 確保工具提示不被父元素裁切 */
 }
 
 .stats-card .card-icon {
@@ -2470,6 +2690,206 @@ export default {
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 500;
+}
+
+/* 工具提示相關樣式 */
+.stats-card.estimated-earnings {
+  position: relative;
+}
+
+.formula-help-icon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--brand-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1.5px solid rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.1);
+  z-index: 10;
+}
+
+.formula-help-icon:hover {
+  background: rgba(99, 102, 241, 0.25);
+  transform: scale(1.1);
+  border-color: rgba(99, 102, 241, 0.5);
+  box-shadow: 0 4px 8px rgba(99, 102, 241, 0.2);
+}
+
+.formula-tooltip {
+  position: absolute;
+  top: 35px;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15));
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  padding: 0;
+  z-index: 9999; /* 提升層級，避免被其他元素蓋住 */
+  min-width: 350px;
+  max-width: 450px;
+  max-height: 500px;
+  overflow-y: auto;
+  opacity: 1;
+  animation: tooltipFadeIn 0.2s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tooltip-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08)); background: transparent; border-radius: 12px 12px 0 0; }
+
+.tooltip-header h4 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: 0.02em; color: var(--text-primary); }
+
+.close-tooltip { background: none; border: none; font-size: 18px; font-weight: 600; color: var(--text-secondary); cursor: pointer; padding: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: all 0.2s ease; }
+
+.close-tooltip:hover {
+  background: var(--hover-bg, rgba(0, 0, 0, 0.1));
+  color: var(--text-primary);
+}
+
+.tooltip-content { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.tooltip-content.simple-list { gap: 8px; }
+.tooltip-item { display: flex; flex-direction: column; gap: 4px; }
+.item-title { font-size: 12px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.04em; }
+.item-desc { font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+
+.formula-section { margin-bottom: 0; }
+
+.formula-section:last-child {
+  margin-bottom: 0;
+}
+
+.formula-section h5 { margin: 0 0 6px 0; font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+
+.formula-text { margin: 0; padding: 10px 12px; background: var(--bg-secondary); border: 1px dashed var(--border-color, rgba(0,0,0,0.12)); border-radius: 8px; font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.5; }
+
+.formula-params {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.formula-params li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.formula-params li strong {
+  display: block;
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.error-note {
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 6px;
+  color: var(--danger) !important;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.info-note {
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 6px;
+  color: var(--brand-primary) !important;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.success-note {
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 6px;
+  color: var(--success) !important;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.status-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-detail {
+  margin: 0;
+  padding: 6px 10px;
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+  border-radius: 4px;
+  color: var(--text-secondary) !important;
+  font-size: 12px;
+  line-height: 1.4;
+  border-left: 3px solid rgba(99, 102, 241, 0.3);
+}
+
+.formula-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-note {
+  margin: 0;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(59, 130, 246, 0.08));
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 8px;
+  color: var(--brand-secondary) !important;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.summary-note span {
+  color: var(--brand-primary) !important;
+  font-weight: 700;
+}
+
+.summary-detail {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+  border-radius: 6px;
+  color: var(--text-secondary) !important;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  font-style: italic;
 }
 
 /* 交易記錄列表 */
@@ -3165,6 +3585,25 @@ export default {
     font-size: 9px;
   }
   
+  .formula-tooltip {
+    min-width: 280px;
+    max-width: 320px;
+    right: 0;
+    left: auto;
+  }
+  
+  .tooltip-header {
+    padding: 12px 16px;
+  }
+  
+  .tooltip-content {
+    padding: 16px;
+  }
+  
+  .formula-section {
+    margin-bottom: 16px;
+  }
+  
   .transaction-item {
     padding: 10px;
   }
@@ -3294,6 +3733,35 @@ export default {
     font-size: 8px;
   }
   
+  .formula-tooltip {
+    min-width: 260px;
+    max-width: 300px;
+    right: 0;
+    left: auto;
+  }
+  
+  .tooltip-header {
+    padding: 10px 12px;
+  }
+  
+  .tooltip-content {
+    padding: 12px;
+  }
+  
+  .formula-section {
+    margin-bottom: 12px;
+  }
+  
+  .formula-text {
+    font-size: 12px;
+    padding: 10px;
+  }
+  
+  .formula-params li {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
   .transaction-item {
     padding: 8px;
   }
@@ -3382,6 +3850,31 @@ export default {
   .overview-card .main-amount {
     font-size: 24px;
   }
+}
+
+/* 小箭頭，指向右上角問號圖示 */
+.formula-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: 16px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid var(--bg-card);
+}
+
+.formula-tooltip::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  right: 15px;
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 9px solid var(--border-color, rgba(0, 0, 0, 0.15));
 }
 
 </style> 
